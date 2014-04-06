@@ -1,3 +1,4 @@
+#include <ql/quantlib.hpp>
 
 std::vector<std::vector<Matrix> > theVegaBumps(bool factorwiseBumping,
                                                boost::shared_ptr<MarketModel> marketModel,
@@ -138,9 +139,6 @@ int Bermudan()
 
 
     // set up a calibration, this would typically be done by using a calibrator
-
-
-
     Real rateLevel =0.05;
 
 
