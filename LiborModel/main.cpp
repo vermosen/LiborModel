@@ -13,35 +13,34 @@
 
 using namespace QuantLib;
 
-static struct dataSet {
+static struct dataSet {										// static struct
 
 	Date reference_ = Date(7, April, 2014);
 	Calendar calendar_ = QuantLib::UnitedStates(QuantLib::UnitedStates::Settlement);
 
+	// build the termstructure
+	boost::shared_ptr<YieldTermStructure> termStructure() {
+
+		boost::shared_ptr<YieldTermStructure> ts(
+			new FlatForward(this->reference_,
+			0.05, Actual365Fixed(),
+			Continuous, Annual));
+
+		return ts;
+
+	}
 
 };
 
-// build the termstructure
-boost::shared_ptr<YieldTermStructure> termStructure(const dataSet & ds) {		
+dataSet tt;													// global variable declaration
 
-	Date reference(7, April, 2014);							// reference date
-	boost::shared_ptr<YieldTermStructure> ts(
-		new FlatForward(ds.reference_,
-						0.05, Actual365Fixed(), 
-						Continuous, Annual));
-
-	return ts;
-
-}
 
 int main() {
 
 	try {
 
-		dataSet ds;
-
-		// creating the yield curve
-		boost::shared_ptr<YieldTermStructure> ts = termStructure(ds);
+		// load the yield curve
+		boost::shared_ptr<YieldTermStructure> ts = tt.termStructure();
 
 		// creating the correlation matrix
 
