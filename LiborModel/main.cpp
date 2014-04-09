@@ -27,6 +27,7 @@ struct dataSet {										// static struct
 	std::vector<Time> maturities_ = std::vector<Time>{
 		.10, .25, .50, .75, 1.0, 1.5, 2.0};
 
+	/* initial volatilities */
 	std::vector<Volatility> volatilities_ = std::vector<Volatility>{
 		.05, .05, .05 , .045, .045, .04, .04};
 
@@ -42,8 +43,6 @@ struct dataSet {										// static struct
 	
 	Real gamma_ = 1.0;
 	
-	Size numberOfFactors_ = std::min<Size>(5, maturities_.size());
-
 	/* termstructure building */
 	boost::shared_ptr<YieldTermStructure> termStructure() {
 
@@ -84,12 +83,15 @@ struct dataSet {										// static struct
 
 	}
 
-	// create the evolution description
+	// create the evolution description, i.e the map of maturities to generate
 	boost::shared_ptr<EvolutionDescription> evolution() {
 	
+		std::vector<Time> v;
+		for (long i = 1; i < 20; i++)
+			v.push_back(.1 * i);
+		
 		return boost::shared_ptr<EvolutionDescription>(
-			new EvolutionDescription(
-				maturities_));
+			new EvolutionDescription(v));
 	
 	}
 
@@ -115,6 +117,15 @@ int main() {
 		// create a sobol BM generator factory
 		SobolBrownianGeneratorFactory generatorFactory(
 			SobolBrownianGenerator::Diagonal, seed);
+
+		// generate the numeraires
+		std::vector<Size> numeraires(moneyMarketMeasure(*tt.evolution()));
+
+		// create the evolaver
+		LogNormalFwdRatePc  evolver(
+			model,
+			generatorFactory,
+			numeraires);
 
 		// creating .csv file
 		QuantLib::utilities::csvBuilder test("C://Temp/test.csv");
