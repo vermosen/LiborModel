@@ -25,7 +25,7 @@ struct dataSet {										// static struct
 
 	/* rate maturities (temp) */
 	std::vector<Time> maturities_ = std::vector<Time>{
-		.10, .25, .50, .75, 1.0, 1.5, 2.0};
+		.10, .25, .50, .75, 1.0, 1.5, 2.0, 3.0};
 
 	/* initial volatilities */
 	std::vector<Volatility> volatilities_ = std::vector<Volatility>{
@@ -86,12 +86,8 @@ struct dataSet {										// static struct
 	// create the evolution description, i.e the map of maturities to generate
 	boost::shared_ptr<EvolutionDescription> evolution() {
 	
-		std::vector<Time> v;
-		for (long i = 1; i < 20; i++)
-			v.push_back(.1 * i);
-		
 		return boost::shared_ptr<EvolutionDescription>(
-			new EvolutionDescription(v));
+			new EvolutionDescription(maturities_));
 	
 	}
 
@@ -121,7 +117,7 @@ int main() {
 		// generate the numeraires
 		std::vector<Size> numeraires(moneyMarketMeasure(*tt.evolution()));
 
-		// create the evolaver
+		// create the evolver
 		LogNormalFwdRatePc  evolver(
 			model,
 			generatorFactory,
