@@ -1,752 +1,534 @@
-#include <ql/quantlib.hpp>
+/* -*- mode: c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-std::vector<std::vector<Matrix> > theVegaBumps(bool factorwiseBumping,
-                                               boost::shared_ptr<MarketModel> marketModel,
-                                               bool doCaps)
-{
-    Real multiplierCutOff = 50.0;
-    Real projectionTolerance = 1E-4;
-    Size numberRates= marketModel->numberOfRates();
+/*
+Copyright (C) 2007 Ferdinando Ametrano
+Copyright (C) 2007 Marco Bianchetti
+Copyright (C) 2007 Cristina Duminuco
+Copyright (C) 2007 Mark Joshi
 
-    std::vector<VolatilityBumpInstrumentJacobian::Cap> caps;
+This file is part of QuantLib, a free-software/open-source library
+for financial quantitative analysts and developers - http://quantlib.org/
 
-    if (doCaps)
-    {
+QuantLib is free software: you can redistribute it and/or modify it
+under the terms of the QuantLib license.  You should have received a
+copy of the license along with this program; if not, please email
+<quantlib-dev@lists.sf.net>. The license is also available online at
+<http://quantlib.org/license.shtml>.
 
-        Rate capStrike = marketModel->initialRates()[0];
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the license for more details.
+*/
 
-        for (Size i=0; i< numberRates-1; i=i+1)
-        {
-            VolatilityBumpInstrumentJacobian::Cap nextCap;
-            nextCap.startIndex_ = i;
-            nextCap.endIndex_ = i+1;
-            nextCap.strike_ = capStrike;
-            caps.push_back(nextCap);
-        }
+#include "marketmodel_smmcapletcalibration.hpp"
+#include "utilities.hpp"
+#include <ql/models/marketmodels/correlations/cotswapfromfwdcorrelation.hpp>
+#include <ql/models/marketmodels/correlations/timehomogeneousforwardcorrelation.hpp>
+#include <ql/models/marketmodels/models/piecewiseconstantabcdvariance.hpp>
+#include <ql/models/marketmodels/models/capletcoterminalswaptioncalibration.hpp>
+#include <ql/models/marketmodels/models/cotswaptofwdadapter.hpp>
+#include <ql/models/marketmodels/models/pseudorootfacade.hpp>
+#include <ql/models/marketmodels/products/multistep/multistepcoterminalswaps.hpp>
+#include <ql/models/marketmodels/products/multistep/multistepcoterminalswaptions.hpp>
+#include <ql/models/marketmodels/products/multistep/multistepswap.hpp>
+#include <ql/models/marketmodels/products/multiproductcomposite.hpp>
+#include <ql/models/marketmodels/accountingengine.hpp>
+#include <ql/models/marketmodels/utilities.hpp>
+#include <ql/models/marketmodels/evolvers/lognormalcotswapratepc.hpp>
+#include <ql/models/marketmodels/evolvers/lognormalfwdratepc.hpp>
+#include <ql/models/marketmodels/correlations/expcorrelations.hpp>
+#include <ql/models/marketmodels/models/flatvol.hpp>
+#include <ql/models/marketmodels/models/abcdvol.hpp>
+#include <ql/models/marketmodels/browniangenerators/mtbrowniangenerator.hpp>
+#include <ql/models/marketmodels/browniangenerators/sobolbrowniangenerator.hpp>
+#include <ql/models/marketmodels/swapforwardmappings.hpp>
+#include <ql/models/marketmodels/curvestates/coterminalswapcurvestate.hpp>
+#include <ql/methods/montecarlo/genericlsregression.hpp>
+#include <ql/legacy/libormarketmodels/lmlinexpcorrmodel.hpp>
+#include <ql/legacy/libormarketmodels/lmextlinexpvolmodel.hpp>
+#include <ql/time/schedule.hpp>
+#include <ql/time/calendars/nullcalendar.hpp>
+#include <ql/time/daycounters/simpledaycounter.hpp>
+#include <ql/pricingengines/blackformula.hpp>
+#include <ql/pricingengines/blackcalculator.hpp>
+#include <ql/utilities/dataformatters.hpp>
+#include <ql/math/integrals/segmentintegral.hpp>
+#include <ql/math/statistics/convergencestatistics.hpp>
+#include <ql/math/functional.hpp>
+#include <ql/math/statistics/sequencestatistics.hpp>
+#include <sstream>
 
-
-    }
-
-
-
-    std::vector<VolatilityBumpInstrumentJacobian::Swaption> swaptions(numberRates);
-
-    for (Size i=0; i < numberRates; ++i)
-    {
-        swaptions[i].startIndex_ = i;
-        swaptions[i].endIndex_ = numberRates;
-
-    }
-
-    VegaBumpCollection possibleBumps(marketModel,
-        factorwiseBumping);
-
-    OrthogonalizedBumpFinder  bumpFinder(possibleBumps,
-        swaptions,
-        caps,
-        multiplierCutOff, // if vector length grows by more than this discard
-        projectionTolerance);      // if vector projection before scaling less than this discard
-
-    std::vector<std::vector<Matrix> > theBumps;
-
-    bumpFinder.GetVegaBumps(theBumps);
-
-    return theBumps;
-
-}
-
-
-
-int Bermudan()
-{
-
-    Size numberRates =20;
-    Real accrual = 0.5;
-    Real firstTime = 0.5;
-
-
-    std::vector<Real> rateTimes(numberRates+1);
-    for (Size i=0; i < rateTimes.size(); ++i)
-        rateTimes[i] = firstTime + i*accrual;
-
-    std::vector<Real> paymentTimes(numberRates);
-    std::vector<Real> accruals(numberRates,accrual);
-    for (Size i=0; i < paymentTimes.size(); ++i)
-        paymentTimes[i] = firstTime + (i+1)*accrual;
-
-
-
-
-    Real fixedRate = 0.05;
-    std::vector<Real> strikes(numberRates,fixedRate);
-    Real receive = -1.0;
-
-    // 0. a payer swap
-    MultiStepSwap payerSwap(rateTimes, accruals, accruals, paymentTimes,
-        fixedRate, true);
-
-    // 1. the equivalent receiver swap
-    MultiStepSwap receiverSwap(rateTimes, accruals, accruals, paymentTimes,
-        fixedRate, false);
-
-    //exercise schedule, we can exercise on any rate time except the last one
-    std::vector<Rate> exerciseTimes(rateTimes);
-    exerciseTimes.pop_back();
-
-    // naive exercise strategy, exercise above a trigger level
-    std::vector<Rate> swapTriggers(exerciseTimes.size(), fixedRate);
-    SwapRateTrigger naifStrategy(rateTimes, swapTriggers, exerciseTimes);
-
-    // Longstaff-Schwartz exercise strategy
-    std::vector<std::vector<NodeData> > collectedData;
-    std::vector<std::vector<Real> > basisCoefficients;
-
-    // control that does nothing, need it because some control is expected
-    NothingExerciseValue control(rateTimes);
-
-//    SwapForwardBasisSystem basisSystem(rateTimes,exerciseTimes);
-    SwapBasisSystem basisSystem(rateTimes,exerciseTimes);
-
-
-
-    // rebate that does nothing, need it because some rebate is expected
-    // when you break a swap nothing happens.
-    NothingExerciseValue nullRebate(rateTimes);
-
-    CallSpecifiedMultiProduct dummyProduct =
-        CallSpecifiedMultiProduct(receiverSwap, naifStrategy,
-        ExerciseAdapter(nullRebate));
-
-    EvolutionDescription evolution = dummyProduct.evolution();
-
-
-    // parameters for models
-
-
-    Size seed = 12332; // for Sobol generator
-    Size trainingPaths = 65536;
-    Size paths = 16384;
-    Size vegaPaths = 16384*64;
-
-    std::cout << "training paths, " << trainingPaths << "\n";
-    std::cout << "paths, " << paths << "\n";
-    std::cout << "vega Paths, " << vegaPaths << "\n";
-#ifdef _DEBUG
-   trainingPaths = 512;
-  paths = 1024;
-  vegaPaths = 1024;
+#if defined(BOOST_MSVC)
+#include <float.h>
+//namespace { unsigned int u = _controlfp(_EM_INEXACT, _MCW_EM); }
 #endif
 
-
-    // set up a calibration, this would typically be done by using a calibrator
-    Real rateLevel =0.05;
-
-
-    Real initialNumeraireValue = 0.95;
-
-    Real volLevel = 0.11;
-    Real beta = 0.2;
-    Real gamma = 1.0;
-    Size numberOfFactors = std::min<Size>(5,numberRates);
-
-    Spread displacementLevel =0.02;
-
-    // set up vectors
-    std::vector<Rate> initialRates(numberRates,rateLevel);
-    std::vector<Volatility> volatilities(numberRates, volLevel);
-    std::vector<Spread> displacements(numberRates, displacementLevel);
-
-    ExponentialForwardCorrelation correlations(
-        rateTimes,volLevel, beta,gamma);
-
-
-
-
-    FlatVol  calibration(
-        volatilities,
-        boost::shared_ptr<PiecewiseConstantCorrelation>(new  ExponentialForwardCorrelation(correlations)),
-        evolution,
-        numberOfFactors,
-        initialRates,
-        displacements);
-
-    boost::shared_ptr<MarketModel> marketModel(new FlatVol(calibration));
-
-    // we use a factory since there is data that will only be known later
-    SobolBrownianGeneratorFactory generatorFactory(
-        SobolBrownianGenerator::Diagonal, seed);
-
-    std::vector<Size> numeraires( moneyMarketMeasure(evolution));
-
-    // the evolver will actually evolve the rates
-    LogNormalFwdRatePc  evolver(marketModel,
-        generatorFactory,
-        numeraires   // numeraires for each step
-        );
-
-    boost::shared_ptr<MarketModelEvolver> evolverPtr(new LogNormalFwdRatePc(evolver));
-
-    int t1= clock();
-
-    // gather data before computing exercise strategy
-    collectNodeData(evolver,
-        receiverSwap,
-        basisSystem,
-        nullRebate,
-        control,
-        trainingPaths,
-        collectedData);
-
-    int t2 = clock();
-
-
-    // calculate the exercise strategy's coefficients
-    genericLongstaffSchwartzRegression(collectedData,
-        basisCoefficients);
-
-
-    // turn the coefficients into an exercise strategy
-    LongstaffSchwartzExerciseStrategy exerciseStrategy(
-        basisSystem, basisCoefficients,
-        evolution, numeraires,
-        nullRebate, control);
-
-    //  bermudan swaption to enter into the payer swap
-    CallSpecifiedMultiProduct bermudanProduct =
-        CallSpecifiedMultiProduct(
-        MultiStepNothing(evolution),
-        exerciseStrategy, payerSwap);
-
-    //  callable receiver swap
-    CallSpecifiedMultiProduct callableProduct =
-        CallSpecifiedMultiProduct(
-        receiverSwap, exerciseStrategy,
-        ExerciseAdapter(nullRebate));
-
-    // lower bound: evolve all 4 products togheter
-    MultiProductComposite allProducts;
-    allProducts.add(payerSwap);
-    allProducts.add(receiverSwap);
-    allProducts.add(bermudanProduct);
-    allProducts.add(callableProduct);
-    allProducts.finalize();
-
-    AccountingEngine accounter(evolverPtr,
-        Clone<MarketModelMultiProduct>(allProducts),
-        initialNumeraireValue);
-
-    SequenceStatisticsInc stats;
-
-    accounter.multiplePathValues (stats,paths);
-
-    int t3 = clock();
-
-    std::vector<Real> means(stats.mean());
-
-    for (Size i=0; i < means.size(); ++i)
-        std::cout << means[i] << "\n";
-
-    std::cout << " time to build strategy, " << (t2-t1)/static_cast<Real>(CLOCKS_PER_SEC)<< ", seconds.\n";
-    std::cout << " time to price, " << (t3-t2)/static_cast<Real>(CLOCKS_PER_SEC)<< ", seconds.\n";
-
-    // vegas
-
-    // do it twice once with factorwise bumping, once without
-    Size pathsToDoVegas = vegaPaths;
-
-    for (Size i=0; i < 4; ++i)
-    {
-
-        bool allowFactorwiseBumping = i % 2 > 0 ;
-
-        bool doCaps = i / 2 > 0 ;
-
-
-
-
-
-        LogNormalFwdRateEuler evolverEuler(marketModel,
-            generatorFactory,
-            numeraires
-            ) ;
-
-        MarketModelPathwiseSwap receiverPathwiseSwap(  rateTimes,
-            accruals,
-            strikes,
-            receive);
-        Clone<MarketModelPathwiseMultiProduct> receiverPathwiseSwapPtr(receiverPathwiseSwap.clone());
-
-        //  callable receiver swap
-        CallSpecifiedPathwiseMultiProduct callableProductPathwise(receiverPathwiseSwapPtr,
-            exerciseStrategy);
-
-        Clone<MarketModelPathwiseMultiProduct> callableProductPathwisePtr(callableProductPathwise.clone());
-
-
-        std::vector<std::vector<Matrix> > theBumps(theVegaBumps(allowFactorwiseBumping,
-            marketModel,
-            doCaps));
-
-        PathwiseVegasOuterAccountingEngine
-            accountingEngineVegas(boost::shared_ptr<LogNormalFwdRateEuler>(new LogNormalFwdRateEuler(evolverEuler)),
-            callableProductPathwisePtr,
-            marketModel,
-            theBumps,
-            initialNumeraireValue);
-
-        std::vector<Real> values,errors;
-
-        accountingEngineVegas.multiplePathValues(values,errors,pathsToDoVegas);
-
-
-        std::cout << "vega output \n";
-        std::cout << " factorwise bumping " << allowFactorwiseBumping << "\n";
-        std::cout << " doCaps " << doCaps << "\n";
-
-
-
-        Size r=0;
-
-        std::cout << " price estimate, " << values[r++] << "\n";
-
-        for (Size i=0; i < numberRates; ++i, ++r)
-            std::cout << " Delta, " << i << ", " << values[r] << ", " << errors[r] << "\n";
-
-        Real totalVega = 0.0;
-
-        for (; r < values.size(); ++r)
-        {
-            std::cout << " vega, " << r - 1 -  numberRates<< ", " << values[r] << " ," << errors[r] << "\n";
-            totalVega +=  values[r];
-        }
-
-        std::cout << " total Vega, " << totalVega << "\n";
-    }
-
-    bool doUpperBound = true;
-
-    if (doUpperBound)
-    {
-
-        // upper bound
-
-        MTBrownianGeneratorFactory uFactory(seed+142);
-
-
-        boost::shared_ptr<MarketModelEvolver> upperEvolver(new LogNormalFwdRatePc( boost::shared_ptr<MarketModel>(new FlatVol(calibration)),
-            uFactory,
-            numeraires   // numeraires for each step
-            ));
-
-        std::vector<boost::shared_ptr<MarketModelEvolver> > innerEvolvers;
-
-        std::valarray<bool> isExerciseTime =   isInSubset(evolution.evolutionTimes(),    exerciseStrategy.exerciseTimes());
-
-        for (Size s=0; s < isExerciseTime.size(); ++s)
-        {
-            if (isExerciseTime[s])
-            {
-                MTBrownianGeneratorFactory iFactory(seed+s);
-                boost::shared_ptr<MarketModelEvolver> e =boost::shared_ptr<MarketModelEvolver> (static_cast<MarketModelEvolver*>(new   LogNormalFwdRatePc(boost::shared_ptr<MarketModel>(new FlatVol(calibration)),
-                    uFactory,
-                    numeraires ,  // numeraires for each step
-                    s)));
-
-                innerEvolvers.push_back(e);
-            }
-        }
-
-
-
-        UpperBoundEngine uEngine(upperEvolver,  // does outer paths
-            innerEvolvers, // for sub-simulations that do continuation values
-            receiverSwap,
-            nullRebate,
-            receiverSwap,
-            nullRebate,
-            exerciseStrategy,
-            initialNumeraireValue);
-
-        Statistics uStats;
-        Size innerPaths = 255;
-        Size outerPaths =256;
-
-        int t4 = clock();
-
-        uEngine.multiplePathValues(uStats,outerPaths,innerPaths);
-        Real upperBound = uStats.mean();
-        Real upperSE = uStats.errorEstimate();
-
-        int t5=clock();
-
-        std::cout << " Upper - lower is, " << upperBound << ", with standard error " << upperSE << "\n";
-        std::cout << " time to compute upper bound is,  " << (t5-t4)/static_cast<Real>(CLOCKS_PER_SEC) << ", seconds.\n";
-
-    }
-
-    return 0;
-}
-
-int InverseFloater(Real rateLevel)
-{
-
-    Size numberRates =20;
-    Real accrual = 0.5;
-    Real firstTime = 0.5;
-
-    Real strike =0.15;
-    Real fixedMultiplier = 2.0;
-    Real floatingSpread =0.0;
-    bool payer = true;
-
-
-    std::vector<Real> rateTimes(numberRates+1);
-    for (Size i=0; i < rateTimes.size(); ++i)
-        rateTimes[i] = firstTime + i*accrual;
-
-    std::vector<Real> paymentTimes(numberRates);
-    std::vector<Real> accruals(numberRates,accrual);
-    std::vector<Real> fixedStrikes(numberRates,strike);
-    std::vector<Real> floatingSpreads(numberRates,floatingSpread);
-    std::vector<Real> fixedMultipliers(numberRates,fixedMultiplier);
-
-    for (Size i=0; i < paymentTimes.size(); ++i)
-        paymentTimes[i] = firstTime + (i+1)*accrual;
-
-  MultiStepInverseFloater inverseFloater(
-                                                        rateTimes,
-                                                        accruals,
-                                                         accruals,
-                                                        fixedStrikes,
-                                                        fixedMultipliers,
-                                                        floatingSpreads,
-                                                         paymentTimes,
-                                                         payer);
-
-
-
-
-    //exercise schedule, we can exercise on any rate time except the last one
-    std::vector<Rate> exerciseTimes(rateTimes);
-    exerciseTimes.pop_back();
-
-    // naive exercise strategy, exercise above a trigger level
-    Real trigger =0.05;
-    std::vector<Rate> swapTriggers(exerciseTimes.size(), trigger);
-    SwapRateTrigger naifStrategy(rateTimes, swapTriggers, exerciseTimes);
-
-    // Longstaff-Schwartz exercise strategy
-    std::vector<std::vector<NodeData> > collectedData;
-    std::vector<std::vector<Real> > basisCoefficients;
-
-    // control that does nothing, need it because some control is expected
-    NothingExerciseValue control(rateTimes);
-
-   SwapForwardBasisSystem basisSystem(rateTimes,exerciseTimes);
-//    SwapBasisSystem basisSystem(rateTimes,exerciseTimes);
-
-
-
-    // rebate that does nothing, need it because some rebate is expected
-    // when you break a swap nothing happens.
-    NothingExerciseValue nullRebate(rateTimes);
-
-    CallSpecifiedMultiProduct dummyProduct =
-        CallSpecifiedMultiProduct(inverseFloater, naifStrategy,
-        ExerciseAdapter(nullRebate));
-
-    EvolutionDescription evolution = dummyProduct.evolution();
-
-
-    // parameters for models
-
-
-    Size seed = 12332; // for Sobol generator
-    Size trainingPaths = 65536;
-    Size paths = 65536;
-    Size vegaPaths =16384;
+using namespace QuantLib;
+using namespace boost::unit_test_framework;
+
+#define BEGIN(x) (x+0)
+#define END(x) (x+LENGTH(x))
+
+namespace {
+
+	Date todaysDate_, startDate_, endDate_;
+	std::vector<Time> rateTimes_;
+	std::vector<Real> accruals_;
+	Calendar calendar_;
+	DayCounter dayCounter_;
+	std::vector<Rate> todaysForwards_, todaysSwaps_;
+	std::vector<Real> coterminalAnnuity_;
+	Size numberOfFactors_;
+	Real alpha_, alphaMax_, alphaMin_;
+	Spread displacement_;
+	std::vector<DiscountFactor> todaysDiscounts_;
+	std::vector<Volatility> swaptionDisplacedVols_, swaptionVols_;
+	std::vector<Volatility> capletDisplacedVols_, capletVols_;
+	Real a_, b_, c_, d_;
+	Real longTermCorrelation_, beta_;
+	Size measureOffset_;
+	unsigned long seed_;
+	Size paths_, trainingPaths_;
+	bool printReport_ = false;
+
+	void setup() {
+
+		// Times
+		calendar_ = NullCalendar();
+		todaysDate_ = Settings::instance().evaluationDate();
+		//startDate = todaysDate + 5*Years;
+		endDate_ = todaysDate_ + 66 * Months;
+		Schedule dates(todaysDate_, endDate_, Period(Semiannual),
+			calendar_, Following, Following, DateGeneration::Backward, false);
+		rateTimes_ = std::vector<Time>(dates.size() - 1);
+		accruals_ = std::vector<Real>(rateTimes_.size() - 1);
+		dayCounter_ = SimpleDayCounter();
+		for (Size i = 1; i<dates.size(); ++i)
+			rateTimes_[i - 1] = dayCounter_.yearFraction(todaysDate_, dates[i]);
+		for (Size i = 1; i<rateTimes_.size(); ++i)
+			accruals_[i - 1] = rateTimes_[i] - rateTimes_[i - 1];
+
+		// Rates & displacement
+		todaysForwards_ = std::vector<Rate>(accruals_.size());
+		numberOfFactors_ = 3;
+		alpha_ = -0.05;
+		alphaMax_ = 1.0;
+		alphaMin_ = -1.0;
+		displacement_ = 0.0;
+		for (Size i = 0; i<todaysForwards_.size(); ++i) {
+			todaysForwards_[i] = 0.03 + 0.0025*i;
+			//todaysForwards_[i] = 0.03;
+		}
+		LMMCurveState curveState_lmm(rateTimes_);
+		curveState_lmm.setOnForwardRates(todaysForwards_);
+		todaysSwaps_ = curveState_lmm.coterminalSwapRates();
+
+		// Discounts
+		todaysDiscounts_ = std::vector<DiscountFactor>(rateTimes_.size());
+		todaysDiscounts_[0] = 0.95;
+		for (Size i = 1; i<rateTimes_.size(); ++i)
+			todaysDiscounts_[i] = todaysDiscounts_[i - 1] /
+			(1.0 + todaysForwards_[i - 1] * accruals_[i - 1]);
+
+		//// Swaption Volatilities
+		//Volatility mktSwaptionVols[] = {
+		//                        0.15541283,
+		//                        0.18719678,
+		//                        0.20890740,
+		//                        0.22318179,
+		//                        0.23212717,
+		//                        0.23731450,
+		//                        0.23988649,
+		//                        0.24066384,
+		//                        0.24023111,
+		//                        0.23900189,
+		//                        0.23726699,
+		//                        0.23522952,
+		//                        0.23303022,
+		//                        0.23076564,
+		//                        0.22850101,
+		//                        0.22627951,
+		//                        0.22412881,
+		//                        0.22206569,
+		//                        0.22009939
+		//};
+
+		//a = -0.0597;
+		//b =  0.1677;
+		//c =  0.5403;
+		//d =  0.1710;
+
+		a_ = 0.0;
+		b_ = 0.17;
+		c_ = 1.0;
+		d_ = 0.10;
+
+		Volatility mktCapletVols[] = {
+			0.1640,
+			0.1740,
+			0.1840,
+			0.1940,
+			0.1840,
+			0.1740,
+			0.1640,
+			0.1540,
+			0.1440,
+			0.1340376439125532
+		};
+
+		//swaptionDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
+		//swaptionVols = std::vector<Volatility>(todaysSwaps.size());
+		//capletDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
+		capletVols_.resize(todaysSwaps_.size());
+		for (Size i = 0; i<todaysSwaps_.size(); i++) {
+			//    swaptionDisplacedVols[i] = todaysSwaps[i]*mktSwaptionVols[i]/
+			//                              (todaysSwaps[i]+displacement);
+			//    swaptionVols[i]= mktSwaptionVols[i];
+			//    capletDisplacedVols[i] = todaysForwards[i]*mktCapletVols[i]/
+			//                            (todaysForwards[i]+displacement);
+			capletVols_[i] = mktCapletVols[i];
+		}
+
+		// Cap/Floor Correlation
+		longTermCorrelation_ = 0.5;
+		beta_ = 0.2;
+		measureOffset_ = 5;
+
+		// Monte Carlo
+		seed_ = 42;
 
 #ifdef _DEBUG
-   trainingPaths = 8192;
-  paths = 8192;
-  vegaPaths = 1024;
+		paths_ = 127;
+		trainingPaths_ = 31;
+#else
+		paths_ = 32767; //262144-1; //; // 2^15-1
+		trainingPaths_ = 8191; // 2^13-1
 #endif
-
-
-    std::cout <<  " inverse floater \n";
-    std::cout << " fixed strikes :  "  << strike << "\n";
-    std::cout << " number rates :  " << numberRates << "\n";
-
-    std::cout << "training paths, " << trainingPaths << "\n";
-    std::cout << "paths, " << paths << "\n";
-    std::cout << "vega Paths, " << vegaPaths << "\n";
-
-
-    // set up a calibration, this would typically be done by using a calibrator
-
-
-
-    //Real rateLevel =0.08;
-
-    std::cout << " rate level " <<  rateLevel << "\n";
-
-    Real initialNumeraireValue = 0.95;
-
-    Real volLevel = 0.11;
-    Real beta = 0.2;
-    Real gamma = 1.0;
-    Size numberOfFactors = std::min<Size>(5,numberRates);
-
-    Spread displacementLevel =0.02;
-
-    // set up vectors
-    std::vector<Rate> initialRates(numberRates,rateLevel);
-    std::vector<Volatility> volatilities(numberRates, volLevel);
-    std::vector<Spread> displacements(numberRates, displacementLevel);
-
-    ExponentialForwardCorrelation correlations(
-        rateTimes,volLevel, beta,gamma);
-
-
-
-
-    FlatVol  calibration(
-        volatilities,
-        boost::shared_ptr<PiecewiseConstantCorrelation>(new  ExponentialForwardCorrelation(correlations)),
-        evolution,
-        numberOfFactors,
-        initialRates,
-        displacements);
-
-    boost::shared_ptr<MarketModel> marketModel(new FlatVol(calibration));
-
-    // we use a factory since there is data that will only be known later
-    SobolBrownianGeneratorFactory generatorFactory(
-        SobolBrownianGenerator::Diagonal, seed);
-
-    std::vector<Size> numeraires( moneyMarketMeasure(evolution));
-
-    // the evolver will actually evolve the rates
-    LogNormalFwdRatePc  evolver(marketModel,
-        generatorFactory,
-        numeraires   // numeraires for each step
-        );
-
-    boost::shared_ptr<MarketModelEvolver> evolverPtr(new LogNormalFwdRatePc(evolver));
-
-    int t1= clock();
-
-    // gather data before computing exercise strategy
-    collectNodeData(evolver,
-        inverseFloater,
-        basisSystem,
-        nullRebate,
-        control,
-        trainingPaths,
-        collectedData);
-
-    int t2 = clock();
-
-
-    // calculate the exercise strategy's coefficients
-    genericLongstaffSchwartzRegression(collectedData,
-        basisCoefficients);
-
-
-    // turn the coefficients into an exercise strategy
-    LongstaffSchwartzExerciseStrategy exerciseStrategy(
-        basisSystem, basisCoefficients,
-        evolution, numeraires,
-        nullRebate, control);
-
-
-    //  callable receiver swap
-    CallSpecifiedMultiProduct callableProduct =
-        CallSpecifiedMultiProduct(
-        inverseFloater, exerciseStrategy,
-        ExerciseAdapter(nullRebate));
-
-     MultiProductComposite allProducts;
-    allProducts.add(inverseFloater);
-    allProducts.add(callableProduct);
-    allProducts.finalize();
-
-
-    AccountingEngine accounter(evolverPtr,
-        Clone<MarketModelMultiProduct>(allProducts),
-        initialNumeraireValue);
-
-    SequenceStatisticsInc stats;
-
-    accounter.multiplePathValues (stats,paths);
-
-    int t3 = clock();
-
-    std::vector<Real> means(stats.mean());
-
-    for (Size i=0; i < means.size(); ++i)
-        std::cout << means[i] << "\n";
-
-    std::cout << " time to build strategy, " << (t2-t1)/static_cast<Real>(CLOCKS_PER_SEC)<< ", seconds.\n";
-    std::cout << " time to price, " << (t3-t2)/static_cast<Real>(CLOCKS_PER_SEC)<< ", seconds.\n";
-
-    // vegas
-
-    // do it twice once with factorwise bumping, once without
-    Size pathsToDoVegas = vegaPaths;
-
-    for (Size i=0; i < 4; ++i)
-    {
-
-        bool allowFactorwiseBumping = i % 2 > 0 ;
-
-        bool doCaps = i / 2 > 0 ;
-
-
-        LogNormalFwdRateEuler evolverEuler(marketModel,
-            generatorFactory,
-            numeraires
-            ) ;
-
-        MarketModelPathwiseInverseFloater pathwiseInverseFloater(
-                                                         rateTimes,
-                                                         accruals,
-                                                         accruals,
-                                                         fixedStrikes,
-                                                         fixedMultipliers,
-                                                         floatingSpreads,
-                                                         paymentTimes,
-                                                         payer);
-
-        Clone<MarketModelPathwiseMultiProduct> pathwiseInverseFloaterPtr(pathwiseInverseFloater.clone());
-
-        //  callable inverse floater
-        CallSpecifiedPathwiseMultiProduct callableProductPathwise(pathwiseInverseFloaterPtr,
-                                                                                                                                               exerciseStrategy);
-
-        Clone<MarketModelPathwiseMultiProduct> callableProductPathwisePtr(callableProductPathwise.clone());
-
-
-        std::vector<std::vector<Matrix> > theBumps(theVegaBumps(allowFactorwiseBumping,
-            marketModel,
-            doCaps));
-
-        PathwiseVegasOuterAccountingEngine
-            accountingEngineVegas(boost::shared_ptr<LogNormalFwdRateEuler>(new LogNormalFwdRateEuler(evolverEuler)),
-   //         pathwiseInverseFloaterPtr,
-            callableProductPathwisePtr,
-            marketModel,
-            theBumps,
-            initialNumeraireValue);
-
-        std::vector<Real> values,errors;
-
-        accountingEngineVegas.multiplePathValues(values,errors,pathsToDoVegas);
-
-
-        std::cout << "vega output \n";
-        std::cout << " factorwise bumping " << allowFactorwiseBumping << "\n";
-        std::cout << " doCaps " << doCaps << "\n";
-
-
-
-        Size r=0;
-
-        std::cout << " price estimate, " << values[r++] << "\n";
-
-        for (Size i=0; i < numberRates; ++i, ++r)
-            std::cout << " Delta, " << i << ", " << values[r] << ", " << errors[r] << "\n";
-
-        Real totalVega = 0.0;
-
-        for (; r < values.size(); ++r)
-        {
-            std::cout << " vega, " << r - 1 -  numberRates<< ", " << values[r] << " ," << errors[r] << "\n";
-            totalVega +=  values[r];
-        }
-
-        std::cout << " total Vega, " << totalVega << "\n";
-    }
-
-    bool doUpperBound = true;
-
-    if (doUpperBound)
-    {
-
-        // upper bound
-
-        MTBrownianGeneratorFactory uFactory(seed+142);
-
-
-        boost::shared_ptr<MarketModelEvolver> upperEvolver(new LogNormalFwdRatePc( boost::shared_ptr<MarketModel>(new FlatVol(calibration)),
-            uFactory,
-            numeraires   // numeraires for each step
-            ));
-
-        std::vector<boost::shared_ptr<MarketModelEvolver> > innerEvolvers;
-
-        std::valarray<bool> isExerciseTime =   isInSubset(evolution.evolutionTimes(),    exerciseStrategy.exerciseTimes());
-
-        for (Size s=0; s < isExerciseTime.size(); ++s)
-        {
-            if (isExerciseTime[s])
-            {
-                MTBrownianGeneratorFactory iFactory(seed+s);
-                boost::shared_ptr<MarketModelEvolver> e =boost::shared_ptr<MarketModelEvolver> (static_cast<MarketModelEvolver*>(new   LogNormalFwdRatePc(boost::shared_ptr<MarketModel>(new FlatVol(calibration)),
-                    uFactory,
-                    numeraires ,  // numeraires for each step
-                    s)));
-
-                innerEvolvers.push_back(e);
-            }
-        }
-
-
-
-        UpperBoundEngine uEngine(upperEvolver,  // does outer paths
-            innerEvolvers, // for sub-simulations that do continuation values
-            inverseFloater,
-            nullRebate,
-            inverseFloater,
-            nullRebate,
-            exerciseStrategy,
-            initialNumeraireValue);
-
-        Statistics uStats;
-        Size innerPaths = 255;
-        Size outerPaths =256;
-
-        int t4 = clock();
-
-        uEngine.multiplePathValues(uStats,outerPaths,innerPaths);
-        Real upperBound = uStats.mean();
-        Real upperSE = uStats.errorEstimate();
-
-        int t5=clock();
-
-        std::cout << " Upper - lower is, " << upperBound << ", with standard error " << upperSE << "\n";
-        std::cout << " time to compute upper bound is,  " << (t5-t4)/static_cast<Real>(CLOCKS_PER_SEC) << ", seconds.\n";
-
-    }
-
-
-
-    return 0;
+	}
+
+	const boost::shared_ptr<SequenceStatisticsInc> simulate(
+		const boost::shared_ptr<MarketModelEvolver>& evolver,
+		const MarketModelMultiProduct& product) {
+		Size initialNumeraire = evolver->numeraires().front();
+		Real initialNumeraireValue = todaysDiscounts_[initialNumeraire];
+
+		AccountingEngine engine(evolver, product, initialNumeraireValue);
+		boost::shared_ptr<SequenceStatisticsInc> stats(
+			new SequenceStatisticsInc(product.numberOfProducts()));
+		engine.multiplePathValues(*stats, paths_);
+		return stats;
+	}
+
+
+	enum MarketModelType {
+		ExponentialCorrelationFlatVolatility,
+		ExponentialCorrelationAbcdVolatility/*,
+											CalibratedMM*/
+	};
+
+	std::string marketModelTypeToString(MarketModelType type) {
+		switch (type) {
+		case ExponentialCorrelationFlatVolatility:
+			return "Exp. Corr. Flat Vol.";
+		case ExponentialCorrelationAbcdVolatility:
+			return "Exp. Corr. Abcd Vol.";
+			//case CalibratedMM:
+			//    return "CalibratedMarketModel";
+		default:
+			QL_FAIL("unknown MarketModelEvolver type");
+		}
+	}
+
+
+	boost::shared_ptr<MarketModel> makeMarketModel(
+		const EvolutionDescription& evolution,
+		Size numberOfFactors,
+		MarketModelType marketModelType,
+		Spread rateBump = 0.0,
+		Volatility volBump = 0.0) {
+
+		std::vector<Time> fixingTimes(evolution.rateTimes());
+		fixingTimes.pop_back();
+		boost::shared_ptr<LmVolatilityModel> volModel(new
+			LmExtLinearExponentialVolModel(fixingTimes, 0.5, 0.6, 0.1, 0.1));
+		boost::shared_ptr<LmCorrelationModel> corrModel(new
+			LmLinearExponentialCorrelationModel(evolution.numberOfRates(),
+			longTermCorrelation_, beta_));
+		std::vector<Rate> bumpedRates(todaysForwards_.size());
+		LMMCurveState curveState_lmm(rateTimes_);
+		curveState_lmm.setOnForwardRates(todaysForwards_);
+		std::vector<Rate> usedRates = curveState_lmm.coterminalSwapRates();
+		std::transform(usedRates.begin(), usedRates.end(),
+			bumpedRates.begin(),
+			std::bind1st(std::plus<Rate>(), rateBump));
+
+		std::vector<Volatility> bumpedVols(swaptionDisplacedVols_.size());
+		std::transform(swaptionDisplacedVols_.begin(), swaptionDisplacedVols_.end(),
+			bumpedVols.begin(),
+			std::bind1st(std::plus<Rate>(), volBump));
+		Matrix correlations = exponentialCorrelations(evolution.rateTimes(),
+			longTermCorrelation_,
+			beta_);
+		boost::shared_ptr<PiecewiseConstantCorrelation> corr(new
+			TimeHomogeneousForwardCorrelation(correlations,
+			evolution.rateTimes()));
+		switch (marketModelType) {
+		case ExponentialCorrelationFlatVolatility:
+			return boost::shared_ptr<MarketModel>(new
+				FlatVol(bumpedVols,
+				corr,
+				evolution,
+				numberOfFactors,
+				bumpedRates,
+				std::vector<Spread>(bumpedRates.size(),
+				displacement_)));
+		case ExponentialCorrelationAbcdVolatility:
+			return boost::shared_ptr<MarketModel>(new
+				AbcdVol(0.0, 0.0, 1.0, 1.0,
+				bumpedVols,
+				corr,
+				evolution,
+				numberOfFactors,
+				bumpedRates,
+				std::vector<Spread>(bumpedRates.size(),
+				displacement_)));
+			//case CalibratedMM:
+			//    return boost::shared_ptr<MarketModel>(new
+			//        CalibratedMarketModel(volModel, corrModel,
+			//                              evolution,
+			//                              numberOfFactors,
+			//                              bumpedForwards,
+			//                              displacement));
+		default:
+			QL_FAIL("unknown MarketModel type");
+		}
+	}
+
+	enum MeasureType {
+		ProductSuggested, Terminal,
+		MoneyMarket, MoneyMarketPlus
+	};
+
+	std::string measureTypeToString(MeasureType type) {
+		switch (type) {
+		case ProductSuggested:
+			return "ProductSuggested measure";
+		case Terminal:
+			return "Terminal measure";
+		case MoneyMarket:
+			return "Money Market measure";
+		case MoneyMarketPlus:
+			return "Money Market Plus measure";
+		default:
+			QL_FAIL("unknown measure type");
+		}
+	}
+
+	std::vector<Size> makeMeasure(const MarketModelMultiProduct& product,
+		MeasureType measureType) {
+		std::vector<Size> result;
+		EvolutionDescription evolution(product.evolution());
+		switch (measureType) {
+		case ProductSuggested:
+			result = product.suggestedNumeraires();
+			break;
+		case Terminal:
+			result = terminalMeasure(evolution);
+			if (!isInTerminalMeasure(evolution, result)) {
+				BOOST_ERROR("\nfailure in verifying Terminal measure:\n"
+					<< to_stream(result));
+			}
+			break;
+		case MoneyMarket:
+			result = moneyMarketMeasure(evolution);
+			if (!isInMoneyMarketMeasure(evolution, result)) {
+				BOOST_ERROR("\nfailure in verifying MoneyMarket measure:\n"
+					<< to_stream(result));
+			}
+			break;
+		case MoneyMarketPlus:
+			result = moneyMarketPlusMeasure(evolution, measureOffset_);
+			if (!isInMoneyMarketPlusMeasure(evolution, result, measureOffset_)) {
+				BOOST_ERROR("\nfailure in verifying MoneyMarketPlus(" <<
+					measureOffset_ << ") measure:\n" <<
+					to_stream(result));
+			}
+			break;
+		default:
+			QL_FAIL("unknown measure type");
+		}
+		checkCompatibility(evolution, result);
+		if (printReport_) {
+			BOOST_TEST_MESSAGE("    " << measureTypeToString(measureType) << ": " << to_stream(result));
+		}
+		return result;
+	}
+
+	enum EvolverType { Ipc, Pc, NormalPc };
+
+	std::string evolverTypeToString(EvolverType type) {
+		switch (type) {
+		case Ipc:
+			return "iterative predictor corrector";
+		case Pc:
+			return "predictor corrector";
+		case NormalPc:
+			return "predictor corrector for normal case";
+		default:
+			QL_FAIL("unknown MarketModelEvolver type");
+		}
+	}
+
+	boost::shared_ptr<MarketModelEvolver> makeMarketModelEvolver(
+		const boost::shared_ptr<MarketModel>& marketModel,
+		const std::vector<Size>& numeraires,
+		const BrownianGeneratorFactory& generatorFactory,
+		EvolverType evolverType,
+		Size initialStep = 0) {
+		switch (evolverType) {
+		case Pc:
+			return boost::shared_ptr<MarketModelEvolver>(new
+				LogNormalCotSwapRatePc(marketModel, generatorFactory,
+				numeraires,
+				initialStep));
+		default:
+			QL_FAIL("unknown CoterminalSwapMarketModelEvolver type");
+		}
+	}
 
 }
 
-int main()
-{
-    try {
-        for (Size i=5; i < 10; ++i)
-            InverseFloater(i/100.0);
 
-        return 0;
-    } catch (std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return 1;
-    } catch (...) {
-        std::cerr << "unknown error" << std::endl;
-        return 1;
-    }
+
+void MarketModelSmmCapletCalibrationTest::testFunction() {
+
+	BOOST_TEST_MESSAGE("Testing GHLS caplet calibration "
+		"in a lognormal coterminal swap market model...");
+
+	setup();
+
+	Size numberOfRates = todaysForwards_.size();
+
+	EvolutionDescription evolution(rateTimes_);
+	// Size numberOfSteps = evolution.numberOfSteps();
+
+	boost::shared_ptr<PiecewiseConstantCorrelation> fwdCorr(new
+		ExponentialForwardCorrelation(rateTimes_,
+		longTermCorrelation_,
+		beta_));
+
+	boost::shared_ptr<LMMCurveState> cs(new LMMCurveState(rateTimes_));
+	cs->setOnForwardRates(todaysForwards_);
+
+	boost::shared_ptr<PiecewiseConstantCorrelation> corr(new
+		CotSwapFromFwdCorrelation(fwdCorr, *cs, displacement_));
+
+	std::vector<boost::shared_ptr<PiecewiseConstantVariance> >
+		swapVariances(numberOfRates);
+	for (Size i = 0; i<numberOfRates; ++i) {
+		swapVariances[i] = boost::shared_ptr<PiecewiseConstantVariance>(new
+			PiecewiseConstantAbcdVariance(a_, b_, c_, d_,
+			i, rateTimes_));
+	}
+
+	// create calibrator
+	std::vector<Real> alpha(numberOfRates, alpha_);
+	bool lowestRoot = true;
+	bool useFullApprox = false;
+	if (printReport_) {
+		BOOST_TEST_MESSAGE("caplet market vols: " << QL_FIXED <<
+			std::setprecision(4) << io::sequence(capletVols_));
+		BOOST_TEST_MESSAGE("alpha:              " << alpha_);
+		BOOST_TEST_MESSAGE("lowestRoot:         " << lowestRoot);
+		BOOST_TEST_MESSAGE("useFullApprox:      " << useFullApprox);
+	}
+	CTSMMCapletOriginalCalibration calibrator(evolution,
+		corr,
+		swapVariances,
+		capletVols_,
+		cs,
+		displacement_,
+		alpha,
+		lowestRoot,
+		useFullApprox);
+	// calibrate
+	Natural maxIterations = 2;
+	Real capletTolerance = (maxIterations == 1 ? 0.0032 : 0.0001);
+	Natural innerMaxIterations = 50;
+	Real innerTolerance = 1e-9;
+	if (printReport_) {
+		BOOST_TEST_MESSAGE("alpha:              " << alpha_);
+		BOOST_TEST_MESSAGE("lowestRoot:         " << lowestRoot);
+		BOOST_TEST_MESSAGE("useFullApprox:      " << useFullApprox);
+	}
+	bool result = calibrator.calibrate(numberOfFactors_,
+		maxIterations,
+		capletTolerance / 10,
+		innerMaxIterations,
+		innerTolerance);
+	if (!result)
+		BOOST_ERROR("calibration failed");
+
+	const std::vector<Matrix>& swapPseudoRoots = calibrator.swapPseudoRoots();
+	boost::shared_ptr<MarketModel> smm(new
+		PseudoRootFacade(swapPseudoRoots,
+		rateTimes_,
+		cs->coterminalSwapRates(),
+		std::vector<Spread>(numberOfRates, displacement_)));
+	CotSwapToFwdAdapter flmm(smm);
+	Matrix capletTotCovariance = flmm.totalCovariance(numberOfRates - 1);
+
+	std::vector<Volatility> capletVols(numberOfRates);
+	for (Size i = 0; i<numberOfRates; ++i) {
+		capletVols[i] = std::sqrt(capletTotCovariance[i][i] / rateTimes_[i]);
+	}
+	if (printReport_) {
+		BOOST_TEST_MESSAGE("caplet smm implied vols: " << QL_FIXED <<
+			std::setprecision(4) << io::sequence(capletVols));
+		BOOST_TEST_MESSAGE("failures: " << calibrator.failures());
+		BOOST_TEST_MESSAGE("deformationSize: " << calibrator.deformationSize());
+		BOOST_TEST_MESSAGE("capletRmsError: " << calibrator.capletRmsError());
+		BOOST_TEST_MESSAGE("capletMaxError: " << calibrator.capletMaxError());
+		BOOST_TEST_MESSAGE("swaptionRmsError: " << calibrator.swaptionRmsError());
+		BOOST_TEST_MESSAGE("swaptionMaxError: " << calibrator.swaptionMaxError());
+	}
+
+	// check perfect swaption fit
+	Real error, swapTolerance = 1e-14;
+	Matrix swapTerminalCovariance(numberOfRates, numberOfRates, 0.0);
+	for (Size i = 0; i<numberOfRates; ++i) {
+		Volatility expSwaptionVol = swapVariances[i]->totalVolatility(i);
+		swapTerminalCovariance += swapPseudoRoots[i] * transpose(swapPseudoRoots[i]);
+		Volatility swaptionVol = std::sqrt(swapTerminalCovariance[i][i] / rateTimes_[i]);
+		error = std::fabs(swaptionVol - expSwaptionVol);
+		if (error>swapTolerance)
+			BOOST_ERROR("failed to reproduce " << io::ordinal(i + 1) << " swaption vol:"
+			"\n expected:  " << io::rate(expSwaptionVol) <<
+			"\n realized:  " << io::rate(swaptionVol) <<
+			"\n error:     " << error <<
+			"\n tolerance: " << swapTolerance);
+	}
+
+	// check caplet fit
+	for (Size i = 0; i<numberOfRates; ++i) {
+		error = std::fabs(capletVols[i] - capletVols_[i]);
+		if (error>capletTolerance)
+			BOOST_ERROR("failed to reproduce " << io::ordinal(i + 1) << " caplet vol:"
+			"\n expected:         " << io::rate(capletVols_[i]) <<
+			"\n realized:         " << io::rate(capletVols[i]) <<
+			"\n percentage error: " << error / capletVols_[i] <<
+			"\n error:            " << error <<
+			"\n tolerance:        " << capletTolerance);
+	}
+}
+
+
+// --- Call the desired tests
+test_suite* MarketModelSmmCapletCalibrationTest::suite() {
+	test_suite* suite = BOOST_TEST_SUITE("SMM Caplet calibration test");
+#if !defined(QL_NO_UBLAS_SUPPORT)
+	suite->add(QUANTLIB_TEST_CASE(
+		&MarketModelSmmCapletCalibrationTest::testFunction));
+#endif
+	return suite;
 }
