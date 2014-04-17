@@ -9,354 +9,298 @@
  */
 
 #include <ql/quantlib.hpp>
+#include <ql/utilities/csvBuilder.hpp>
+
 
 using namespace QuantLib;
 
-struct dataSet {										// static struct
+namespace {
 
-	/* time data */
-	Date referenceDate_;
-	Date endDate_;
-	Calendar calendar_;
+	/* create a libor index */
+	boost::shared_ptr<IborIndex> makeIndex(std::vector<Date> dates,
+		std::vector<Rate> rates) {
+		DayCounter dayCounter = Actual360();
 
-	/* termstructure data */
-	boost::shared_ptr<YieldTermStructure> ts_;
+		// notice the relinkable index...
+		RelinkableHandle<YieldTermStructure> termStructure;
 
-	/* initial rates */
-	std::vector<Rate> initialRates_;
+		boost::shared_ptr<IborIndex> index(new Euribor6M(termStructure));
 
-	/* daycounter */
-	DayCounter dayCounter_;
+		Date todaysDate =
+			index->fixingCalendar().adjust(Date(4, September, 2005));
+		Settings::instance().evaluationDate() = todaysDate;
 
-	/* rate maturities (temp) */
-	std::vector<Time> maturities_;
+		dates[0] = index->fixingCalendar().advance(todaysDate,
+			index->fixingDays(), Days);
 
-	/* time differences, close to time fractions */
-	std::vector<Real> accruals_;
-	
+		termStructure.linkTo(boost::shared_ptr<YieldTermStructure>(
+			new ZeroCurve(dates, rates, dayCounter)));
+
+		return index;
+	}
+
+	/* feed an index with data */
+	boost::shared_ptr<IborIndex> makeIndex() {
+		std::vector<Date> dates;
+		std::vector<Rate> rates;
+		dates.push_back(Date(4, September, 2005));
+		dates.push_back(Date(4, September, 2018));
+		rates.push_back(0.039);
+		rates.push_back(0.041);
+
+		return makeIndex(dates, rates);
+	}
+
+}
+
+struct depositData {
+
+	Real   quote_;
+	Natural settlementDays_;
+	Period maturity_;
+
 };
 
-static dataSet tt;												// global variable declaration
+struct swaptionData {
 
+	Volatility volatility_;
+	Period     maturity_;
+	Period     lenght_;
 
-void setup() {
-
-	// Times
-	tt.calendar_ = NullCalendar();
-	Settings::instance().evaluationDate = Date(7, April, 2014);
-	tt.referenceDate_ = Settings::instance().evaluationDate();
-	tt.endDate_ = tt.referenceDate_ + 5 * Years;
-
-	// termstructure Initialization
-	tt.dayCounter_ = Actual365Fixed();
-
-	tt.ts_ = boost::shared_ptr<YieldTermStructure>(
-		new FlatForward(
-		tt.referenceDate_,
-		0.05, tt.dayCounter_,
-		Continuous, Annual));
-
-	// create the schredule for the dates
-	Schedule dates(
-		tt.referenceDate_, 
-		tt.endDate_, 
-		Period(Semiannual),
-		tt.calendar_, Following, 
-		Following, DateGeneration::Backward, 
-		false);
-
-	tt.maturities_ = std::vector<Time>(dates.size() - 1);
-	tt.accruals_ = std::vector<Real>(tt.maturities_.size() - 1);
-	
-	for (Size i = 1; i<dates.size(); ++i)
-		tt.maturities_[i - 1] = tt.dayCounter_.yearFraction(tt.referenceDate_, dates[i]);
-	
-	for (Size i = 1; i<tt.maturities_.size(); ++i)
-		tt.accruals_[i - 1] = tt.maturities_[i] - tt.maturities_[i - 1];
-
-	// Rates & displacement
-	todaysForwards_ = std::vector<Rate>(accruals_.size());
-	numberOfFactors_ = 3;
-	alpha_ = -0.05;
-	alphaMax_ = 1.0;
-	alphaMin_ = -1.0;
-	displacement_ = 0.0;
-	for (Size i = 0; i<todaysForwards_.size(); ++i) {
-		todaysForwards_[i] = 0.03 + 0.0025*i;
-		//todaysForwards_[i] = 0.03;
-	}
-	LMMCurveState curveState_lmm(rateTimes_);
-	curveState_lmm.setOnForwardRates(todaysForwards_);
-	todaysSwaps_ = curveState_lmm.coterminalSwapRates();
-
-	// Discounts
-	todaysDiscounts_ = std::vector<DiscountFactor>(rateTimes_.size());
-	todaysDiscounts_[0] = 0.95;
-	for (Size i = 1; i<rateTimes_.size(); ++i)
-		todaysDiscounts_[i] = todaysDiscounts_[i - 1] /
-		(1.0 + todaysForwards_[i - 1] * accruals_[i - 1]);
-
-	//// Swaption Volatilities
-	//Volatility mktSwaptionVols[] = {
-	//                        0.15541283,
-	//                        0.18719678,
-	//                        0.20890740,
-	//                        0.22318179,
-	//                        0.23212717,
-	//                        0.23731450,
-	//                        0.23988649,
-	//                        0.24066384,
-	//                        0.24023111,
-	//                        0.23900189,
-	//                        0.23726699,
-	//                        0.23522952,
-	//                        0.23303022,
-	//                        0.23076564,
-	//                        0.22850101,
-	//                        0.22627951,
-	//                        0.22412881,
-	//                        0.22206569,
-	//                        0.22009939
-	//};
-
-	//a = -0.0597;
-	//b =  0.1677;
-	//c =  0.5403;
-	//d =  0.1710;
-
-	a_ = 0.0;
-	b_ = 0.17;
-	c_ = 1.0;
-	d_ = 0.10;
-
-	Volatility mktCapletVols[] = {
-		0.1640,
-		0.1740,
-		0.1840,
-		0.1940,
-		0.1840,
-		0.1740,
-		0.1640,
-		0.1540,
-		0.1440,
-		0.1340376439125532
-	};
-
-	//swaptionDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
-	//swaptionVols = std::vector<Volatility>(todaysSwaps.size());
-	//capletDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
-	capletVols_.resize(todaysSwaps_.size());
-	for (Size i = 0; i<todaysSwaps_.size(); i++) {
-		//    swaptionDisplacedVols[i] = todaysSwaps[i]*mktSwaptionVols[i]/
-		//                              (todaysSwaps[i]+displacement);
-		//    swaptionVols[i]= mktSwaptionVols[i];
-		//    capletDisplacedVols[i] = todaysForwards[i]*mktCapletVols[i]/
-		//                            (todaysForwards[i]+displacement);
-		capletVols_[i] = mktCapletVols[i];
-	}
-
-	// Cap/Floor Correlation
-	longTermCorrelation_ = 0.5;
-	beta_ = 0.2;
-	measureOffset_ = 5;
-
-	// Monte Carlo
-	seed_ = 42;
-
-#ifdef _DEBUG
-	paths_ = 127;
-	trainingPaths_ = 31;
-#else
-	paths_ = 32767; //262144-1; //; // 2^15-1
-	trainingPaths_ = 8191; // 2^13-1
-#endif
-}
-
-void setup() {
-
-	// Times
-	calendar_ = NullCalendar();
-	todaysDate_ = Settings::instance().evaluationDate();
-	//startDate = todaysDate + 5*Years;
-	endDate_ = todaysDate_ + 66 * Months;
-	Schedule dates(todaysDate_, endDate_, Period(Semiannual),
-		calendar_, Following, Following, DateGeneration::Backward, false);
-	rateTimes_ = std::vector<Time>(dates.size() - 1);
-	accruals_ = std::vector<Real>(rateTimes_.size() - 1);
-	dayCounter_ = SimpleDayCounter();
-	for (Size i = 1; i<dates.size(); ++i)
-		rateTimes_[i - 1] = dayCounter_.yearFraction(todaysDate_, dates[i]);
-	for (Size i = 1; i<rateTimes_.size(); ++i)
-		accruals_[i - 1] = rateTimes_[i] - rateTimes_[i - 1];
-
-	// Rates & displacement
-	todaysForwards_ = std::vector<Rate>(accruals_.size());
-	numberOfFactors_ = 3;
-	alpha_ = -0.05;
-	alphaMax_ = 1.0;
-	alphaMin_ = -1.0;
-	displacement_ = 0.0;
-	for (Size i = 0; i<todaysForwards_.size(); ++i) {
-		todaysForwards_[i] = 0.03 + 0.0025*i;
-		//todaysForwards_[i] = 0.03;
-	}
-	LMMCurveState curveState_lmm(rateTimes_);
-	curveState_lmm.setOnForwardRates(todaysForwards_);
-	todaysSwaps_ = curveState_lmm.coterminalSwapRates();
-
-	// Discounts
-	todaysDiscounts_ = std::vector<DiscountFactor>(rateTimes_.size());
-	todaysDiscounts_[0] = 0.95;
-	for (Size i = 1; i<rateTimes_.size(); ++i)
-		todaysDiscounts_[i] = todaysDiscounts_[i - 1] /
-		(1.0 + todaysForwards_[i - 1] * accruals_[i - 1]);
-
-	//// Swaption Volatilities
-	//Volatility mktSwaptionVols[] = {
-	//                        0.15541283,
-	//                        0.18719678,
-	//                        0.20890740,
-	//                        0.22318179,
-	//                        0.23212717,
-	//                        0.23731450,
-	//                        0.23988649,
-	//                        0.24066384,
-	//                        0.24023111,
-	//                        0.23900189,
-	//                        0.23726699,
-	//                        0.23522952,
-	//                        0.23303022,
-	//                        0.23076564,
-	//                        0.22850101,
-	//                        0.22627951,
-	//                        0.22412881,
-	//                        0.22206569,
-	//                        0.22009939
-	//};
-
-	//a = -0.0597;
-	//b =  0.1677;
-	//c =  0.5403;
-	//d =  0.1710;
-
-	a_ = 0.0;
-	b_ = 0.17;
-	c_ = 1.0;
-	d_ = 0.10;
-
-	Volatility mktCapletVols[] = {
-		0.1640,
-		0.1740,
-		0.1840,
-		0.1940,
-		0.1840,
-		0.1740,
-		0.1640,
-		0.1540,
-		0.1440,
-		0.1340376439125532
-	};
-
-	//swaptionDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
-	//swaptionVols = std::vector<Volatility>(todaysSwaps.size());
-	//capletDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
-	capletVols_.resize(todaysSwaps_.size());
-	for (Size i = 0; i<todaysSwaps_.size(); i++) {
-		//    swaptionDisplacedVols[i] = todaysSwaps[i]*mktSwaptionVols[i]/
-		//                              (todaysSwaps[i]+displacement);
-		//    swaptionVols[i]= mktSwaptionVols[i];
-		//    capletDisplacedVols[i] = todaysForwards[i]*mktCapletVols[i]/
-		//                            (todaysForwards[i]+displacement);
-		capletVols_[i] = mktCapletVols[i];
-	}
-
-	// Cap/Floor Correlation
-	longTermCorrelation_ = 0.5;
-	beta_ = 0.2;
-	measureOffset_ = 5;
-
-	// Monte Carlo
-	seed_ = 42;
-
-#ifdef _DEBUG
-	paths_ = 127;
-	trainingPaths_ = 31;
-#else
-	paths_ = 32767; //262144-1; //; // 2^15-1
-	trainingPaths_ = 8191; // 2^13-1
-#endif
-}
-
-const boost::shared_ptr<SequenceStatisticsInc> simulate(
-	const boost::shared_ptr<MarketModelEvolver>& evolver,
-	const MarketModelMultiProduct& product) {
-	Size initialNumeraire = evolver->numeraires().front();
-	Real initialNumeraireValue = todaysDiscounts_[initialNumeraire];
-
-	AccountingEngine engine(evolver, product, initialNumeraireValue);
-	boost::shared_ptr<SequenceStatisticsInc> stats(
-		new SequenceStatisticsInc(product.numberOfProducts()));
-	engine.multiplePathValues(*stats, paths_);
-	return stats;
-}
+};
 
 int main() {
 
-	try {
+	std::cout << "Testing calibration of a Libor forward model..." << std::endl;
 
-		// set the evaluation date
-		Settings::instance().evaluationDate() = tt.reference_;
+	SavedSettings backup;
 
-		// load the yield curve
-		tt.initializeTermStructure()
+	const Size size = 20;								// 20 semestrers
+	const Real tolerance = 8e-3;						// tolerance
 
-		// load the correlations
-		Matrix corr = tt.correlations()->correlation(0);
+	const Calendar calendar								// pricing calendar
+		= JointCalendar(
+		UnitedStates(UnitedStates::Settlement),
+		UnitedKingdom(UnitedKingdom::Settlement));
 
-		// creating the model
-		boost::shared_ptr<MarketModel> model = tt.model();
+	const Date pricingDate = Date(16, April, 2014);		// pricing date
 
-		// create a sobol BM generator factory
-		SobolBrownianGeneratorFactory generatorFactory(
-			SobolBrownianGenerator::Diagonal, seed);
+	QuantLib::Settings::instance().evaluationDate()		// set global evaluation date
+		= pricingDate;
 
-		// generate the numeraires
-		std::vector<Size> numeraires(moneyMarketMeasure(*tt.evolution()));
+	std::vector<boost::shared_ptr<RateHelper> > rateHelpers;
 
-		// create the evolver
-		LogNormalFwdRatePc evolver(
-			model,
-			generatorFactory,
-			numeraires);
-
-		// creating .csv file
-		QuantLib::utilities::csvBuilder test("C://Temp/test.csv");
-
-		test.add(corr, 1, 1);									// add correlation matrix
-
-		system("pause");										// console makes a pause
-
-		return 0;
-
-	}
-	catch (std::exception & e) {
+	std::vector<depositData> rates						// yield data
+		= std::vector<depositData> {
 	
-		std::cout << "an error occurred: "
-			<< std::endl
-			<< e.what()
-			<< std::endl;
+			{ .09070, 0, Period(1, Days) },
+			{ .14250, 1, Period(2, Days) },
+			{ .12150, 2, Period(1, Weeks) },
+			{ .15200, 2, Period(1, Months) },
+			{ .19300, 2, Period(2, Months) },
+			{ .22785, 2, Period(3, Months) }
+	
+	};
 
-		system("pause");
-		return 1;
+	
+	for (std::vector<depositData>::const_iterator It = rates.cbegin();
+		It != rates.cend(); It++) {
+	
+		// settlement and maturity dates
+		Date settlement = calendar.advance(
+			pricingDate, Period(It->settlementDays_, Days));
+		Date maturity = calendar.advance(
+			settlement, It->maturity_);
+
+		// creating the deposit
+		boost::shared_ptr<QuantLib::deposit> myDepositPtr(
+			new deposit(
+				pricingDate,
+				maturity,
+				calendar,
+				It->settlementDays_));
+
+		Handle<Quote> quoteHandler(						// quote handle
+			boost::shared_ptr<Quote>(
+				new SimpleQuote(
+					myDepositPtr->cleanPrice(
+					It->quote_,
+					Actual360(),
+					Simple,
+					Once,
+					Unadjusted,
+					settlement))));
+
+
+		rateHelpers.push_back(							// insert RateHelper
+			boost::shared_ptr<RateHelper>(new
+				depositBootstrapHelper(
+					quoteHandler,
+					myDepositPtr)));
 	
 	}
-	catch (...) {
 
-		std::cout << "an unknown error occurred" << std::endl;
-		system("pause");
-		return 1;
+	std::vector<swaptionData> swaptions					// swaption data
+		= std::vector<swaptionData> {
+	
+		{ 0.170595, Period(1, Years), Period(1, Years) },
+		{ 0.166844, Period(1, Years), Period(2, Years) },
+		{ 0.158306, Period(1, Years), Period(3, Years) },
+		{ 0.136930, Period(1, Years), Period(4, Years) },
+		{ 0.126833, Period(1, Years), Period(5, Years) },
+		{ 0.118135, Period(1, Years), Period(6, Years) },
+		{ 0.175963, Period(1, Years), Period(7, Years) },
+		{ 0.166359, Period(1, Years), Period(8, Years) },
+		{ 0.155203, Period(1, Years), Period(9, Years) },
+		{ 0.170595, Period(2, Years), Period(1, Years) },
+		{ 0.166844, Period(2, Years), Period(2, Years) },
+		{ 0.158306, Period(2, Years), Period(3, Years) },
+		{ 0.136930, Period(2, Years), Period(4, Years) },
+		{ 0.126833, Period(2, Years), Period(5, Years) },
+		{ 0.118135, Period(2, Years), Period(6, Years) },
+		{ 0.175963, Period(2, Years), Period(7, Years) },
+		{ 0.166359, Period(2, Years), Period(8, Years) },
+		{ 0.170595, Period(3, Years), Period(1, Years) },
+		{ 0.166844, Period(3, Years), Period(2, Years) },
+		{ 0.158306, Period(3, Years), Period(3, Years) },
+		{ 0.136930, Period(3, Years), Period(4, Years) },
+		{ 0.126833, Period(3, Years), Period(5, Years) },
+		{ 0.118135, Period(3, Years), Period(6, Years) },
+		{ 0.175963, Period(3, Years), Period(7, Years) },
+		{ 0.170595, Period(4, Years), Period(1, Years) },
+		{ 0.166844, Period(4, Years), Period(2, Years) },
+		{ 0.158306, Period(4, Years), Period(3, Years) },
+		{ 0.136930, Period(4, Years), Period(4, Years) },
+		{ 0.126833, Period(4, Years), Period(5, Years) },
+		{ 0.118135, Period(4, Years), Period(6, Years) },
+		{ 0.175963, Period(5, Years), Period(1, Years) },
+		{ 0.166844, Period(5, Years), Period(2, Years) },
+		{ 0.158306, Period(5, Years), Period(3, Years) },
+		{ 0.136930, Period(5, Years), Period(4, Years) },
+		{ 0.126833, Period(5, Years), Period(5, Years) },
+		{ 0.175963, Period(6, Years), Period(1, Years) },
+		{ 0.166844, Period(6, Years), Period(2, Years) },
+		{ 0.158306, Period(6, Years), Period(3, Years) },
+		{ 0.136930, Period(6, Years), Period(4, Years) },
+		{ 0.175963, Period(7, Years), Period(1, Years) },
+		{ 0.166844, Period(7, Years), Period(2, Years) },
+		{ 0.158306, Period(7, Years), Period(3, Years) },
+		{ 0.175963, Period(8, Years), Period(1, Years) },
+		{ 0.166844, Period(8, Years), Period(2, Years) },
+		{ 0.166844, Period(9, Years), Period(1, Years) }
+
+	};
+
+	boost::shared_ptr<IborIndex> index = makeIndex();
+	boost::shared_ptr<LiborForwardModelProcess> process(
+		new LiborForwardModelProcess(size, index));
+	Handle<YieldTermStructure> termStructure = index->forwardingTermStructure();
+
+	// set-up the model
+	boost::shared_ptr<LmVolatilityModel> volaModel(
+		new LmExtLinearExponentialVolModel(process->fixingTimes(),
+		0.5, 0.6, 0.1, 0.1));
+
+	boost::shared_ptr<LmCorrelationModel> corrModel(
+		new LmLinearExponentialCorrelationModel(size, 0.5, 0.8));
+
+	boost::shared_ptr<LiborForwardModel> model(
+		new LiborForwardModel(process, volaModel, corrModel));
+
+	Size swapVolIndex = 0;
+	DayCounter dayCounter = index->forwardingTermStructure()->dayCounter();
+
+	// set-up calibration helper
+	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
+
+	Size i;
+
+	for (i = 0; i < swaptions.size(); i++) {
+	
+		Handle<Quote> swaptionVol(
+			boost::shared_ptr<Quote>(
+			new SimpleQuote(swaptions[i].volatility_)));
+
+		boost::shared_ptr<CalibrationHelper> swaptionHelper(
+			new SwaptionHelper(swaptions[i].maturity_, 
+				swaptions[i].lenght_, swaptionVol, index,
+				index->tenor(), dayCounter,
+				index->dayCounter(),
+				termStructure,
+				CalibrationHelper::ImpliedVolError));
+
+		swaptionHelper->setPricingEngine(
+			boost::shared_ptr<PricingEngine>(
+			new LfmSwaptionEngine(model, termStructure)));
+
+		calibrationHelper.push_back(swaptionHelper);
 
 	}
 
+#ifdef _DEBUG
+
+	LevenbergMarquardt om(1e-5, 1e-5, 1e-5);
+	model->calibrate(calibrationHelper, om, EndCriteria(100, 20, 1e-5, 1e-5, 1e-6));
+
+#else
+
+	LevenbergMarquardt om(1e-6, 1e-6, 1e-6);
+	model->calibrate(calibrationHelper, om, EndCriteria(500, 100, 1e-6, 1e-6, 1e-6));
+
+#endif
+
+	// measure the calibration error
+	Real calculated = 0.0;
+	for (i = 0; i<calibrationHelper.size(); ++i) {
+		Real diff = calibrationHelper[i]->calibrationError();
+		calculated += diff * diff;
+	}
+
+	if (std::sqrt(calculated) > tolerance)
+		std::cout << "Failed to calibrate libor forward model"
+		<< "\n    calculated diff: " << std::sqrt(calculated)
+		<< "\n    expected : smaller than  " << tolerance << std::endl;
+
+	// create diagnostic file
+	{
+		
+		// build file path
+		std::string fileStr("C:/Temp/liborModel_");
+		fileStr.append(boost::posix_time::to_iso_string(
+			boost::posix_time::second_clock::local_time()));
+		fileStr.append(".csv");
+
+		// csv builder
+		utilities::csvBuilder file(fileStr);
+
+		// optimization results
+		file.add(std::string("calibration result:"), 1, 1);	// calibration result
+		
+		switch (model->endCriteria()) {						// different case, could use a factory...
+
+		case EndCriteria::StationaryPoint:
+			file.add(std::string("stationnary point"), 1, 2);
+			break;
+
+		case EndCriteria::MaxIterations:
+			file.add(std::string("Max Iterations reached"), 1, 2);
+			break;
+
+		case EndCriteria::StationaryFunctionValue:
+			file.add("Stationary Function Value reached", 1, 2);
+			break;
+
+		default:
+			file.add(std::string("unknown result"), 1, 2);
+		}
+
+		// swaption volatility matrix
+		file.add("correlation matrix at time zero", 2, 1);
+		file.add(corrModel->correlation(0), 2, 2);
+		
+	}
+
+	system("pause");
+	return 0;
 
 }

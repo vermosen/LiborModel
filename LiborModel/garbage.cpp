@@ -1,534 +1,452 @@
-/* -*- mode: c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-
-/*
-Copyright (C) 2007 Ferdinando Ametrano
-Copyright (C) 2007 Marco Bianchetti
-Copyright (C) 2007 Cristina Duminuco
-Copyright (C) 2007 Mark Joshi
-
-This file is part of QuantLib, a free-software/open-source library
-for financial quantitative analysts and developers - http://quantlib.org/
-
-QuantLib is free software: you can redistribute it and/or modify it
-under the terms of the QuantLib license.  You should have received a
-copy of the license along with this program; if not, please email
-<quantlib-dev@lists.sf.net>. The license is also available online at
-<http://quantlib.org/license.shtml>.
-
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE.  See the license for more details.
-*/
-
-#include "marketmodel_smmcapletcalibration.hpp"
-#include "utilities.hpp"
-#include <ql/models/marketmodels/correlations/cotswapfromfwdcorrelation.hpp>
-#include <ql/models/marketmodels/correlations/timehomogeneousforwardcorrelation.hpp>
-#include <ql/models/marketmodels/models/piecewiseconstantabcdvariance.hpp>
-#include <ql/models/marketmodels/models/capletcoterminalswaptioncalibration.hpp>
-#include <ql/models/marketmodels/models/cotswaptofwdadapter.hpp>
-#include <ql/models/marketmodels/models/pseudorootfacade.hpp>
-#include <ql/models/marketmodels/products/multistep/multistepcoterminalswaps.hpp>
-#include <ql/models/marketmodels/products/multistep/multistepcoterminalswaptions.hpp>
-#include <ql/models/marketmodels/products/multistep/multistepswap.hpp>
-#include <ql/models/marketmodels/products/multiproductcomposite.hpp>
-#include <ql/models/marketmodels/accountingengine.hpp>
-#include <ql/models/marketmodels/utilities.hpp>
-#include <ql/models/marketmodels/evolvers/lognormalcotswapratepc.hpp>
-#include <ql/models/marketmodels/evolvers/lognormalfwdratepc.hpp>
-#include <ql/models/marketmodels/correlations/expcorrelations.hpp>
-#include <ql/models/marketmodels/models/flatvol.hpp>
-#include <ql/models/marketmodels/models/abcdvol.hpp>
-#include <ql/models/marketmodels/browniangenerators/mtbrowniangenerator.hpp>
-#include <ql/models/marketmodels/browniangenerators/sobolbrowniangenerator.hpp>
-#include <ql/models/marketmodels/swapforwardmappings.hpp>
-#include <ql/models/marketmodels/curvestates/coterminalswapcurvestate.hpp>
-#include <ql/methods/montecarlo/genericlsregression.hpp>
-#include <ql/legacy/libormarketmodels/lmlinexpcorrmodel.hpp>
-#include <ql/legacy/libormarketmodels/lmextlinexpvolmodel.hpp>
-#include <ql/time/schedule.hpp>
-#include <ql/time/calendars/nullcalendar.hpp>
-#include <ql/time/daycounters/simpledaycounter.hpp>
-#include <ql/pricingengines/blackformula.hpp>
-#include <ql/pricingengines/blackcalculator.hpp>
-#include <ql/utilities/dataformatters.hpp>
-#include <ql/math/integrals/segmentintegral.hpp>
-#include <ql/math/statistics/convergencestatistics.hpp>
-#include <ql/math/functional.hpp>
-#include <ql/math/statistics/sequencestatistics.hpp>
-#include <sstream>
-
-#if defined(BOOST_MSVC)
-#include <float.h>
-//namespace { unsigned int u = _controlfp(_EM_INEXACT, _MCW_EM); }
-#endif
-
-using namespace QuantLib;
-using namespace boost::unit_test_framework;
-
-#define BEGIN(x) (x+0)
-#define END(x) (x+LENGTH(x))
 
 namespace {
 
-	Date todaysDate_, startDate_, endDate_;
-	std::vector<Time> rateTimes_;
-	std::vector<Real> accruals_;
-	Calendar calendar_;
-	DayCounter dayCounter_;
-	std::vector<Rate> todaysForwards_, todaysSwaps_;
-	std::vector<Real> coterminalAnnuity_;
-	Size numberOfFactors_;
-	Real alpha_, alphaMax_, alphaMin_;
-	Spread displacement_;
-	std::vector<DiscountFactor> todaysDiscounts_;
-	std::vector<Volatility> swaptionDisplacedVols_, swaptionVols_;
-	std::vector<Volatility> capletDisplacedVols_, capletVols_;
-	Real a_, b_, c_, d_;
-	Real longTermCorrelation_, beta_;
-	Size measureOffset_;
-	unsigned long seed_;
-	Size paths_, trainingPaths_;
-	bool printReport_ = false;
+	boost::shared_ptr<IborIndex> makeIndex(std::vector<Date> dates,
+		std::vector<Rate> rates) {
+		DayCounter dayCounter = Actual360();
 
-	void setup() {
+		RelinkableHandle<YieldTermStructure> termStructure;
 
-		// Times
-		calendar_ = NullCalendar();
-		todaysDate_ = Settings::instance().evaluationDate();
-		//startDate = todaysDate + 5*Years;
-		endDate_ = todaysDate_ + 66 * Months;
-		Schedule dates(todaysDate_, endDate_, Period(Semiannual),
-			calendar_, Following, Following, DateGeneration::Backward, false);
-		rateTimes_ = std::vector<Time>(dates.size() - 1);
-		accruals_ = std::vector<Real>(rateTimes_.size() - 1);
-		dayCounter_ = SimpleDayCounter();
-		for (Size i = 1; i<dates.size(); ++i)
-			rateTimes_[i - 1] = dayCounter_.yearFraction(todaysDate_, dates[i]);
-		for (Size i = 1; i<rateTimes_.size(); ++i)
-			accruals_[i - 1] = rateTimes_[i] - rateTimes_[i - 1];
+		boost::shared_ptr<IborIndex> index(new Euribor6M(termStructure));
 
-		// Rates & displacement
-		todaysForwards_ = std::vector<Rate>(accruals_.size());
-		numberOfFactors_ = 3;
-		alpha_ = -0.05;
-		alphaMax_ = 1.0;
-		alphaMin_ = -1.0;
-		displacement_ = 0.0;
-		for (Size i = 0; i<todaysForwards_.size(); ++i) {
-			todaysForwards_[i] = 0.03 + 0.0025*i;
-			//todaysForwards_[i] = 0.03;
+		Date todaysDate =
+			index->fixingCalendar().adjust(Date(4, September, 2005));
+		Settings::instance().evaluationDate() = todaysDate;
+
+		dates[0] = index->fixingCalendar().advance(todaysDate,
+			index->fixingDays(), Days);
+
+		termStructure.linkTo(boost::shared_ptr<YieldTermStructure>(
+			new ZeroCurve(dates, rates, dayCounter)));
+
+		return index;
+	}
+
+
+	boost::shared_ptr<IborIndex> makeIndex() {
+		std::vector<Date> dates;
+		std::vector<Rate> rates;
+		dates.push_back(Date(4, September, 2005));
+		dates.push_back(Date(4, September, 2018));
+		rates.push_back(0.039);
+		rates.push_back(0.041);
+
+		return makeIndex(dates, rates);
+	}
+
+
+	boost::shared_ptr<OptionletVolatilityStructure>
+		makeCapVolCurve(const Date& todaysDate) {
+			Volatility vols[] = { 14.40, 17.15, 16.81, 16.64, 16.17,
+				15.78, 15.40, 15.21, 14.86 };
+
+			std::vector<Date> dates;
+			std::vector<Volatility> capletVols;
+			boost::shared_ptr<LiborForwardModelProcess> process(
+				new LiborForwardModelProcess(10, makeIndex()));
+
+			for (Size i = 0; i < 9; ++i) {
+				capletVols.push_back(vols[i] / 100);
+				dates.push_back(process->fixingDates()[i + 1]);
+			}
+
+			return boost::shared_ptr<CapletVarianceCurve>(
+				new CapletVarianceCurve(todaysDate, dates,
+				capletVols, Actual360()));
+	}
+
+}
+
+
+void LiborMarketModelTest::testSimpleCovarianceModels() {
+	BOOST_TEST_MESSAGE("Testing simple covariance models...");
+
+	SavedSettings backup;
+
+	const Size size = 10;
+	const Real tolerance = 1e-14;
+	Size i;
+
+	boost::shared_ptr<LmCorrelationModel> corrModel(
+		new LmExponentialCorrelationModel(size, 0.1));
+
+	Matrix recon = corrModel->correlation(0.0)
+		- corrModel->pseudoSqrt(0.0)*transpose(corrModel->pseudoSqrt(0.0));
+
+	for (i = 0; i<size; ++i) {
+		for (Size j = 0; j<size; ++j) {
+			if (std::fabs(recon[i][j]) > tolerance)
+				BOOST_ERROR("Failed to reproduce correlation matrix"
+				<< "\n    calculated: " << recon[i][j]
+				<< "\n    expected:   " << 0);
 		}
-		LMMCurveState curveState_lmm(rateTimes_);
-		curveState_lmm.setOnForwardRates(todaysForwards_);
-		todaysSwaps_ = curveState_lmm.coterminalSwapRates();
+	}
 
-		// Discounts
-		todaysDiscounts_ = std::vector<DiscountFactor>(rateTimes_.size());
-		todaysDiscounts_[0] = 0.95;
-		for (Size i = 1; i<rateTimes_.size(); ++i)
-			todaysDiscounts_[i] = todaysDiscounts_[i - 1] /
-			(1.0 + todaysForwards_[i - 1] * accruals_[i - 1]);
+	std::vector<Time> fixingTimes(size);
+	for (i = 0; i<size; ++i) {
+		fixingTimes[i] = 0.5*i;
+	}
 
-		//// Swaption Volatilities
-		//Volatility mktSwaptionVols[] = {
-		//                        0.15541283,
-		//                        0.18719678,
-		//                        0.20890740,
-		//                        0.22318179,
-		//                        0.23212717,
-		//                        0.23731450,
-		//                        0.23988649,
-		//                        0.24066384,
-		//                        0.24023111,
-		//                        0.23900189,
-		//                        0.23726699,
-		//                        0.23522952,
-		//                        0.23303022,
-		//                        0.23076564,
-		//                        0.22850101,
-		//                        0.22627951,
-		//                        0.22412881,
-		//                        0.22206569,
-		//                        0.22009939
-		//};
+	const Real a = 0.2;
+	const Real b = 0.1;
+	const Real c = 2.1;
+	const Real d = 0.3;
 
-		//a = -0.0597;
-		//b =  0.1677;
-		//c =  0.5403;
-		//d =  0.1710;
+	boost::shared_ptr<LmVolatilityModel> volaModel(
+		new LmLinearExponentialVolatilityModel(fixingTimes, a, b, c, d));
 
-		a_ = 0.0;
-		b_ = 0.17;
-		c_ = 1.0;
-		d_ = 0.10;
+	boost::shared_ptr<LfmCovarianceProxy> covarProxy(
+		new LfmCovarianceProxy(volaModel, corrModel));
 
-		Volatility mktCapletVols[] = {
-			0.1640,
-			0.1740,
-			0.1840,
-			0.1940,
-			0.1840,
-			0.1740,
-			0.1640,
-			0.1540,
-			0.1440,
-			0.1340376439125532
-		};
+	boost::shared_ptr<LiborForwardModelProcess> process(
+		new LiborForwardModelProcess(size, makeIndex()));
 
-		//swaptionDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
-		//swaptionVols = std::vector<Volatility>(todaysSwaps.size());
-		//capletDisplacedVols = std::vector<Volatility>(todaysSwaps.size());
-		capletVols_.resize(todaysSwaps_.size());
-		for (Size i = 0; i<todaysSwaps_.size(); i++) {
-			//    swaptionDisplacedVols[i] = todaysSwaps[i]*mktSwaptionVols[i]/
-			//                              (todaysSwaps[i]+displacement);
-			//    swaptionVols[i]= mktSwaptionVols[i];
-			//    capletDisplacedVols[i] = todaysForwards[i]*mktCapletVols[i]/
-			//                            (todaysForwards[i]+displacement);
-			capletVols_[i] = mktCapletVols[i];
+	boost::shared_ptr<LiborForwardModel> liborModel(
+		new LiborForwardModel(process, volaModel, corrModel));
+
+	for (Real t = 0; t<4.6; t += 0.31) {
+		recon = covarProxy->covariance(t)
+			- covarProxy->diffusion(t)*transpose(covarProxy->diffusion(t));
+
+		for (Size i = 0; i<size; ++i) {
+			for (Size j = 0; j<size; ++j) {
+				if (std::fabs(recon[i][j]) > tolerance)
+					BOOST_ERROR("Failed to reproduce correlation matrix"
+					<< "\n    calculated: " << recon[i][j]
+					<< "\n    expected:   " << 0);
+			}
 		}
 
-		// Cap/Floor Correlation
-		longTermCorrelation_ = 0.5;
-		beta_ = 0.2;
-		measureOffset_ = 5;
+		Array volatility = volaModel->volatility(t);
 
-		// Monte Carlo
-		seed_ = 42;
+		for (Size k = 0; k<size; ++k) {
+			Real expected = 0;
+			if (k>2 * t) {
+				const Real T = fixingTimes[k];
+				expected = (a*(T - t) + d)*std::exp(-b*(T - t)) + c;
+			}
 
-#ifdef _DEBUG
-		paths_ = 127;
-		trainingPaths_ = 31;
+			if (std::fabs(expected - volatility[k]) > tolerance)
+				BOOST_ERROR("Failed to reproduce volatities"
+				<< "\n    calculated: " << volatility[k]
+				<< "\n    expected:   " << expected);
+		}
+	}
+}
+
+
+void LiborMarketModelTest::testCapletPricing() {
+	BOOST_TEST_MESSAGE("Testing caplet pricing...");
+
+	SavedSettings backup;
+
+	const Size size = 10;
+#if defined(QL_USE_INDEXED_COUPON)
+	const Real tolerance = 1e-5;
 #else
-		paths_ = 32767; //262144-1; //; // 2^15-1
-		trainingPaths_ = 8191; // 2^13-1
+	const Real tolerance = 1e-12;
 #endif
-	}
 
-	const boost::shared_ptr<SequenceStatisticsInc> simulate(
-		const boost::shared_ptr<MarketModelEvolver>& evolver,
-		const MarketModelMultiProduct& product) {
-		Size initialNumeraire = evolver->numeraires().front();
-		Real initialNumeraireValue = todaysDiscounts_[initialNumeraire];
+	boost::shared_ptr<IborIndex> index = makeIndex();
+	boost::shared_ptr<LiborForwardModelProcess> process(
+		new LiborForwardModelProcess(size, index));
 
-		AccountingEngine engine(evolver, product, initialNumeraireValue);
-		boost::shared_ptr<SequenceStatisticsInc> stats(
-			new SequenceStatisticsInc(product.numberOfProducts()));
-		engine.multiplePathValues(*stats, paths_);
-		return stats;
-	}
+	// set-up pricing engine
+	const boost::shared_ptr<OptionletVolatilityStructure> capVolCurve =
+		makeCapVolCurve(Settings::instance().evaluationDate());
 
+	Array variances = LfmHullWhiteParameterization(process, capVolCurve)
+		.covariance(0.0).diagonal();
 
-	enum MarketModelType {
-		ExponentialCorrelationFlatVolatility,
-		ExponentialCorrelationAbcdVolatility/*,
-											CalibratedMM*/
-	};
+	boost::shared_ptr<LmVolatilityModel> volaModel(
+		new LmFixedVolatilityModel(Sqrt(variances),
+		process->fixingTimes()));
 
-	std::string marketModelTypeToString(MarketModelType type) {
-		switch (type) {
-		case ExponentialCorrelationFlatVolatility:
-			return "Exp. Corr. Flat Vol.";
-		case ExponentialCorrelationAbcdVolatility:
-			return "Exp. Corr. Abcd Vol.";
-			//case CalibratedMM:
-			//    return "CalibratedMarketModel";
-		default:
-			QL_FAIL("unknown MarketModelEvolver type");
-		}
-	}
+	boost::shared_ptr<LmCorrelationModel> corrModel(
+		new LmExponentialCorrelationModel(size, 0.3));
 
+	boost::shared_ptr<AffineModel> model(
+		new LiborForwardModel(process, volaModel, corrModel));
 
-	boost::shared_ptr<MarketModel> makeMarketModel(
-		const EvolutionDescription& evolution,
-		Size numberOfFactors,
-		MarketModelType marketModelType,
-		Spread rateBump = 0.0,
-		Volatility volBump = 0.0) {
+	const Handle<YieldTermStructure> termStructure =
+		process->index()->forwardingTermStructure();
 
-		std::vector<Time> fixingTimes(evolution.rateTimes());
-		fixingTimes.pop_back();
-		boost::shared_ptr<LmVolatilityModel> volModel(new
-			LmExtLinearExponentialVolModel(fixingTimes, 0.5, 0.6, 0.1, 0.1));
-		boost::shared_ptr<LmCorrelationModel> corrModel(new
-			LmLinearExponentialCorrelationModel(evolution.numberOfRates(),
-			longTermCorrelation_, beta_));
-		std::vector<Rate> bumpedRates(todaysForwards_.size());
-		LMMCurveState curveState_lmm(rateTimes_);
-		curveState_lmm.setOnForwardRates(todaysForwards_);
-		std::vector<Rate> usedRates = curveState_lmm.coterminalSwapRates();
-		std::transform(usedRates.begin(), usedRates.end(),
-			bumpedRates.begin(),
-			std::bind1st(std::plus<Rate>(), rateBump));
+	boost::shared_ptr<AnalyticCapFloorEngine> engine1(
+		new AnalyticCapFloorEngine(model, termStructure));
 
-		std::vector<Volatility> bumpedVols(swaptionDisplacedVols_.size());
-		std::transform(swaptionDisplacedVols_.begin(), swaptionDisplacedVols_.end(),
-			bumpedVols.begin(),
-			std::bind1st(std::plus<Rate>(), volBump));
-		Matrix correlations = exponentialCorrelations(evolution.rateTimes(),
-			longTermCorrelation_,
-			beta_);
-		boost::shared_ptr<PiecewiseConstantCorrelation> corr(new
-			TimeHomogeneousForwardCorrelation(correlations,
-			evolution.rateTimes()));
-		switch (marketModelType) {
-		case ExponentialCorrelationFlatVolatility:
-			return boost::shared_ptr<MarketModel>(new
-				FlatVol(bumpedVols,
-				corr,
-				evolution,
-				numberOfFactors,
-				bumpedRates,
-				std::vector<Spread>(bumpedRates.size(),
-				displacement_)));
-		case ExponentialCorrelationAbcdVolatility:
-			return boost::shared_ptr<MarketModel>(new
-				AbcdVol(0.0, 0.0, 1.0, 1.0,
-				bumpedVols,
-				corr,
-				evolution,
-				numberOfFactors,
-				bumpedRates,
-				std::vector<Spread>(bumpedRates.size(),
-				displacement_)));
-			//case CalibratedMM:
-			//    return boost::shared_ptr<MarketModel>(new
-			//        CalibratedMarketModel(volModel, corrModel,
-			//                              evolution,
-			//                              numberOfFactors,
-			//                              bumpedForwards,
-			//                              displacement));
-		default:
-			QL_FAIL("unknown MarketModel type");
-		}
-	}
+	boost::shared_ptr<Cap> cap1(
+		new Cap(process->cashFlows(),
+		std::vector<Rate>(size, 0.04)));
+	cap1->setPricingEngine(engine1);
 
-	enum MeasureType {
-		ProductSuggested, Terminal,
-		MoneyMarket, MoneyMarketPlus
-	};
+	const Real expected = 0.015853935178;
+	const Real calculated = cap1->NPV();
 
-	std::string measureTypeToString(MeasureType type) {
-		switch (type) {
-		case ProductSuggested:
-			return "ProductSuggested measure";
-		case Terminal:
-			return "Terminal measure";
-		case MoneyMarket:
-			return "Money Market measure";
-		case MoneyMarketPlus:
-			return "Money Market Plus measure";
-		default:
-			QL_FAIL("unknown measure type");
-		}
-	}
-
-	std::vector<Size> makeMeasure(const MarketModelMultiProduct& product,
-		MeasureType measureType) {
-		std::vector<Size> result;
-		EvolutionDescription evolution(product.evolution());
-		switch (measureType) {
-		case ProductSuggested:
-			result = product.suggestedNumeraires();
-			break;
-		case Terminal:
-			result = terminalMeasure(evolution);
-			if (!isInTerminalMeasure(evolution, result)) {
-				BOOST_ERROR("\nfailure in verifying Terminal measure:\n"
-					<< to_stream(result));
-			}
-			break;
-		case MoneyMarket:
-			result = moneyMarketMeasure(evolution);
-			if (!isInMoneyMarketMeasure(evolution, result)) {
-				BOOST_ERROR("\nfailure in verifying MoneyMarket measure:\n"
-					<< to_stream(result));
-			}
-			break;
-		case MoneyMarketPlus:
-			result = moneyMarketPlusMeasure(evolution, measureOffset_);
-			if (!isInMoneyMarketPlusMeasure(evolution, result, measureOffset_)) {
-				BOOST_ERROR("\nfailure in verifying MoneyMarketPlus(" <<
-					measureOffset_ << ") measure:\n" <<
-					to_stream(result));
-			}
-			break;
-		default:
-			QL_FAIL("unknown measure type");
-		}
-		checkCompatibility(evolution, result);
-		if (printReport_) {
-			BOOST_TEST_MESSAGE("    " << measureTypeToString(measureType) << ": " << to_stream(result));
-		}
-		return result;
-	}
-
-	enum EvolverType { Ipc, Pc, NormalPc };
-
-	std::string evolverTypeToString(EvolverType type) {
-		switch (type) {
-		case Ipc:
-			return "iterative predictor corrector";
-		case Pc:
-			return "predictor corrector";
-		case NormalPc:
-			return "predictor corrector for normal case";
-		default:
-			QL_FAIL("unknown MarketModelEvolver type");
-		}
-	}
-
-	boost::shared_ptr<MarketModelEvolver> makeMarketModelEvolver(
-		const boost::shared_ptr<MarketModel>& marketModel,
-		const std::vector<Size>& numeraires,
-		const BrownianGeneratorFactory& generatorFactory,
-		EvolverType evolverType,
-		Size initialStep = 0) {
-		switch (evolverType) {
-		case Pc:
-			return boost::shared_ptr<MarketModelEvolver>(new
-				LogNormalCotSwapRatePc(marketModel, generatorFactory,
-				numeraires,
-				initialStep));
-		default:
-			QL_FAIL("unknown CoterminalSwapMarketModelEvolver type");
-		}
-	}
-
+	if (std::fabs(expected - calculated) > tolerance)
+		BOOST_ERROR("Failed to reproduce npv"
+		<< "\n    calculated: " << calculated
+		<< "\n    expected:   " << expected);
 }
 
+void LiborMarketModelTest::testCalibration() {
+	BOOST_TEST_MESSAGE("Testing calibration of a Libor forward model...");
 
+	SavedSettings backup;
 
-void MarketModelSmmCapletCalibrationTest::testFunction() {
+	const Size size = 14;
+	const Real tolerance = 8e-3;
 
-	BOOST_TEST_MESSAGE("Testing GHLS caplet calibration "
-		"in a lognormal coterminal swap market model...");
+	Volatility capVols[] = { 0.145708, 0.158465, 0.166248, 0.168672,
+		0.169007, 0.167956, 0.166261, 0.164239,
+		0.162082, 0.159923, 0.157781, 0.155745,
+		0.153776, 0.151950, 0.150189, 0.148582,
+		0.147034, 0.145598, 0.144248 };
 
-	setup();
+	Volatility swaptionVols[] = { 0.170595, 0.166844, 0.158306, 0.147444,
+		0.136930, 0.126833, 0.118135, 0.175963,
+		0.166359, 0.155203, 0.143712, 0.132769,
+		0.122947, 0.114310, 0.174455, 0.162265,
+		0.150539, 0.138734, 0.128215, 0.118470,
+		0.110540, 0.169780, 0.156860, 0.144821,
+		0.133537, 0.123167, 0.114363, 0.106500,
+		0.164521, 0.151223, 0.139670, 0.128632,
+		0.119123, 0.110330, 0.103114, 0.158956,
+		0.146036, 0.134555, 0.124393, 0.115038,
+		0.106996, 0.100064 };
 
-	Size numberOfRates = todaysForwards_.size();
+	boost::shared_ptr<IborIndex> index = makeIndex();
+	boost::shared_ptr<LiborForwardModelProcess> process(
+		new LiborForwardModelProcess(size, index));
+	Handle<YieldTermStructure> termStructure = index->forwardingTermStructure();
 
-	EvolutionDescription evolution(rateTimes_);
-	// Size numberOfSteps = evolution.numberOfSteps();
+	// set-up the model
+	boost::shared_ptr<LmVolatilityModel> volaModel(
+		new LmExtLinearExponentialVolModel(process->fixingTimes(),
+		0.5, 0.6, 0.1, 0.1));
 
-	boost::shared_ptr<PiecewiseConstantCorrelation> fwdCorr(new
-		ExponentialForwardCorrelation(rateTimes_,
-		longTermCorrelation_,
-		beta_));
+	boost::shared_ptr<LmCorrelationModel> corrModel(
+		new LmLinearExponentialCorrelationModel(size, 0.5, 0.8));
 
-	boost::shared_ptr<LMMCurveState> cs(new LMMCurveState(rateTimes_));
-	cs->setOnForwardRates(todaysForwards_);
+	boost::shared_ptr<LiborForwardModel> model(
+		new LiborForwardModel(process, volaModel, corrModel));
 
-	boost::shared_ptr<PiecewiseConstantCorrelation> corr(new
-		CotSwapFromFwdCorrelation(fwdCorr, *cs, displacement_));
+	Size swapVolIndex = 0;
+	DayCounter dayCounter = index->forwardingTermStructure()->dayCounter();
 
-	std::vector<boost::shared_ptr<PiecewiseConstantVariance> >
-		swapVariances(numberOfRates);
-	for (Size i = 0; i<numberOfRates; ++i) {
-		swapVariances[i] = boost::shared_ptr<PiecewiseConstantVariance>(new
-			PiecewiseConstantAbcdVariance(a_, b_, c_, d_,
-			i, rateTimes_));
+	// set-up calibration helper
+	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
+
+	Size i;
+	for (i = 2; i < size; ++i) {
+		const Period maturity = i*index->tenor();
+		Handle<Quote> capVol(
+			boost::shared_ptr<Quote>(new SimpleQuote(capVols[i - 2])));
+
+		boost::shared_ptr<CalibrationHelper> caphelper(
+			new CapHelper(maturity, capVol, index, Annual,
+			index->dayCounter(), true, termStructure,
+			CalibrationHelper::ImpliedVolError));
+
+		caphelper->setPricingEngine(boost::shared_ptr<PricingEngine>(
+			new AnalyticCapFloorEngine(model, termStructure)));
+
+		calibrationHelper.push_back(caphelper);
+
+		if (i <= size / 2) {
+			// add a few swaptions to test swaption calibration as well
+			for (Size j = 1; j <= size / 2; ++j) {
+				const Period len = j*index->tenor();
+				Handle<Quote> swaptionVol(
+					boost::shared_ptr<Quote>(
+					new SimpleQuote(swaptionVols[swapVolIndex++])));
+
+				boost::shared_ptr<CalibrationHelper> swaptionHelper(
+					new SwaptionHelper(maturity, len, swaptionVol, index,
+					index->tenor(), dayCounter,
+					index->dayCounter(),
+					termStructure,
+					CalibrationHelper::ImpliedVolError));
+
+				swaptionHelper->setPricingEngine(
+					boost::shared_ptr<PricingEngine>(
+					new LfmSwaptionEngine(model, termStructure)));
+
+				calibrationHelper.push_back(swaptionHelper);
+			}
+		}
 	}
 
-	// create calibrator
-	std::vector<Real> alpha(numberOfRates, alpha_);
-	bool lowestRoot = true;
-	bool useFullApprox = false;
-	if (printReport_) {
-		BOOST_TEST_MESSAGE("caplet market vols: " << QL_FIXED <<
-			std::setprecision(4) << io::sequence(capletVols_));
-		BOOST_TEST_MESSAGE("alpha:              " << alpha_);
-		BOOST_TEST_MESSAGE("lowestRoot:         " << lowestRoot);
-		BOOST_TEST_MESSAGE("useFullApprox:      " << useFullApprox);
-	}
-	CTSMMCapletOriginalCalibration calibrator(evolution,
-		corr,
-		swapVariances,
-		capletVols_,
-		cs,
-		displacement_,
-		alpha,
-		lowestRoot,
-		useFullApprox);
-	// calibrate
-	Natural maxIterations = 2;
-	Real capletTolerance = (maxIterations == 1 ? 0.0032 : 0.0001);
-	Natural innerMaxIterations = 50;
-	Real innerTolerance = 1e-9;
-	if (printReport_) {
-		BOOST_TEST_MESSAGE("alpha:              " << alpha_);
-		BOOST_TEST_MESSAGE("lowestRoot:         " << lowestRoot);
-		BOOST_TEST_MESSAGE("useFullApprox:      " << useFullApprox);
-	}
-	bool result = calibrator.calibrate(numberOfFactors_,
-		maxIterations,
-		capletTolerance / 10,
-		innerMaxIterations,
-		innerTolerance);
-	if (!result)
-		BOOST_ERROR("calibration failed");
+	LevenbergMarquardt om(1e-6, 1e-6, 1e-6);
+	model->calibrate(calibrationHelper, om, EndCriteria(2000, 100, 1e-6, 1e-6, 1e-6));
 
-	const std::vector<Matrix>& swapPseudoRoots = calibrator.swapPseudoRoots();
-	boost::shared_ptr<MarketModel> smm(new
-		PseudoRootFacade(swapPseudoRoots,
-		rateTimes_,
-		cs->coterminalSwapRates(),
-		std::vector<Spread>(numberOfRates, displacement_)));
-	CotSwapToFwdAdapter flmm(smm);
-	Matrix capletTotCovariance = flmm.totalCovariance(numberOfRates - 1);
-
-	std::vector<Volatility> capletVols(numberOfRates);
-	for (Size i = 0; i<numberOfRates; ++i) {
-		capletVols[i] = std::sqrt(capletTotCovariance[i][i] / rateTimes_[i]);
-	}
-	if (printReport_) {
-		BOOST_TEST_MESSAGE("caplet smm implied vols: " << QL_FIXED <<
-			std::setprecision(4) << io::sequence(capletVols));
-		BOOST_TEST_MESSAGE("failures: " << calibrator.failures());
-		BOOST_TEST_MESSAGE("deformationSize: " << calibrator.deformationSize());
-		BOOST_TEST_MESSAGE("capletRmsError: " << calibrator.capletRmsError());
-		BOOST_TEST_MESSAGE("capletMaxError: " << calibrator.capletMaxError());
-		BOOST_TEST_MESSAGE("swaptionRmsError: " << calibrator.swaptionRmsError());
-		BOOST_TEST_MESSAGE("swaptionMaxError: " << calibrator.swaptionMaxError());
+	// measure the calibration error
+	Real calculated = 0.0;
+	for (i = 0; i<calibrationHelper.size(); ++i) {
+		Real diff = calibrationHelper[i]->calibrationError();
+		calculated += diff*diff;
 	}
 
-	// check perfect swaption fit
-	Real error, swapTolerance = 1e-14;
-	Matrix swapTerminalCovariance(numberOfRates, numberOfRates, 0.0);
-	for (Size i = 0; i<numberOfRates; ++i) {
-		Volatility expSwaptionVol = swapVariances[i]->totalVolatility(i);
-		swapTerminalCovariance += swapPseudoRoots[i] * transpose(swapPseudoRoots[i]);
-		Volatility swaptionVol = std::sqrt(swapTerminalCovariance[i][i] / rateTimes_[i]);
-		error = std::fabs(swaptionVol - expSwaptionVol);
-		if (error>swapTolerance)
-			BOOST_ERROR("failed to reproduce " << io::ordinal(i + 1) << " swaption vol:"
-			"\n expected:  " << io::rate(expSwaptionVol) <<
-			"\n realized:  " << io::rate(swaptionVol) <<
-			"\n error:     " << error <<
-			"\n tolerance: " << swapTolerance);
+	if (std::sqrt(calculated) > tolerance)
+		BOOST_ERROR("Failed to calibrate libor forward model"
+		<< "\n    calculated diff: " << std::sqrt(calculated)
+		<< "\n    expected : smaller than  " << tolerance);
+}
+
+void LiborMarketModelTest::testSwaptionPricing() {
+	BOOST_TEST_MESSAGE("Testing forward swap and swaption pricing...");
+
+	SavedSettings backup;
+
+	const Size size = 10;
+	const Size steps = 8 * size;
+#if defined(QL_USE_INDEXED_COUPON)
+	const Real tolerance = 1e-6;
+#else
+	const Real tolerance = 1e-12;
+#endif
+
+	std::vector<Date> dates;
+	std::vector<Rate> rates;
+	dates.push_back(Date(4, September, 2005));
+	dates.push_back(Date(4, September, 2011));
+	rates.push_back(0.04);
+	rates.push_back(0.08);
+
+	boost::shared_ptr<IborIndex> index = makeIndex(dates, rates);
+
+	boost::shared_ptr<LiborForwardModelProcess> process(
+		new LiborForwardModelProcess(size, index));
+
+	boost::shared_ptr<LmCorrelationModel> corrModel(
+		new LmExponentialCorrelationModel(size, 0.5));
+
+	boost::shared_ptr<LmVolatilityModel> volaModel(
+		new LmLinearExponentialVolatilityModel(process->fixingTimes(),
+		0.291, 1.483, 0.116, 0.00001));
+
+	// set-up pricing engine
+	process->setCovarParam(boost::shared_ptr<LfmCovarianceParameterization>(
+		new LfmCovarianceProxy(volaModel, corrModel)));
+
+	// set-up a small Monte-Carlo simulation to price swations
+	typedef PseudoRandom::rsg_type rsg_type;
+	typedef MultiPathGenerator<rsg_type>::sample_type sample_type;
+
+	std::vector<Time> tmp = process->fixingTimes();
+	TimeGrid grid(tmp.begin(), tmp.end(), steps);
+
+	Size i;
+	std::vector<Size> location;
+	for (i = 0; i < tmp.size(); ++i) {
+		location.push_back(
+			std::find(grid.begin(), grid.end(), tmp[i]) - grid.begin());
 	}
 
-	// check caplet fit
-	for (Size i = 0; i<numberOfRates; ++i) {
-		error = std::fabs(capletVols[i] - capletVols_[i]);
-		if (error>capletTolerance)
-			BOOST_ERROR("failed to reproduce " << io::ordinal(i + 1) << " caplet vol:"
-			"\n expected:         " << io::rate(capletVols_[i]) <<
-			"\n realized:         " << io::rate(capletVols[i]) <<
-			"\n percentage error: " << error / capletVols_[i] <<
-			"\n error:            " << error <<
-			"\n tolerance:        " << capletTolerance);
+	rsg_type rsg = PseudoRandom::make_sequence_generator(
+		process->factors()*(grid.size() - 1),
+		BigNatural(42));
+
+	const Size nrTrails = 5000;
+	MultiPathGenerator<rsg_type> generator(process, grid, rsg, false);
+
+	boost::shared_ptr<LiborForwardModel>
+		liborModel(new LiborForwardModel(process, volaModel, corrModel));
+
+	Calendar calendar = index->fixingCalendar();
+	DayCounter dayCounter = index->forwardingTermStructure()->dayCounter();
+	BusinessDayConvention convention = index->businessDayConvention();
+
+	Date settlement = index->forwardingTermStructure()->referenceDate();
+
+	boost::shared_ptr<SwaptionVolatilityMatrix> m =
+		liborModel->getSwaptionVolatilityMatrix();
+
+	for (i = 1; i < size; ++i) {
+		for (Size j = 1; j <= size - i; ++j) {
+			Date fwdStart = settlement + Period(6 * i, Months);
+			Date fwdMaturity = fwdStart + Period(6 * j, Months);
+
+			Schedule schedule(fwdStart, fwdMaturity, index->tenor(), calendar,
+				convention, convention, DateGeneration::Forward, false);
+
+			Rate swapRate = 0.0404;
+			boost::shared_ptr<VanillaSwap> forwardSwap(
+				new VanillaSwap(VanillaSwap::Receiver, 1.0,
+				schedule, swapRate, dayCounter,
+				schedule, index, 0.0, index->dayCounter()));
+			forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
+				new DiscountingSwapEngine(index->forwardingTermStructure())));
+
+			// check forward pricing first
+			const Real expected = forwardSwap->fairRate();
+			const Real calculated = liborModel->S_0(i - 1, i + j - 1);
+
+			if (std::fabs(expected - calculated) > tolerance)
+				BOOST_ERROR("Failed to reproduce fair forward swap rate"
+				<< "\n    calculated: " << calculated
+				<< "\n    expected:   " << expected);
+
+			swapRate = forwardSwap->fairRate();
+			forwardSwap = boost::shared_ptr<VanillaSwap>(
+				new VanillaSwap(VanillaSwap::Receiver, 1.0,
+				schedule, swapRate, dayCounter,
+				schedule, index, 0.0, index->dayCounter()));
+			forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
+				new DiscountingSwapEngine(index->forwardingTermStructure())));
+
+			if (i == j && i <= size / 2) {
+				boost::shared_ptr<PricingEngine> engine(
+					new LfmSwaptionEngine(liborModel,
+					index->forwardingTermStructure()));
+				boost::shared_ptr<Exercise> exercise(
+					new EuropeanExercise(process->fixingDates()[i]));
+
+				boost::shared_ptr<Swaption> swaption(
+					new Swaption(forwardSwap, exercise));
+				swaption->setPricingEngine(engine);
+
+				GeneralStatistics stat;
+
+				for (Size n = 0; n<nrTrails; ++n) {
+					sample_type path = (n % 2) ? generator.antithetic()
+						: generator.next();
+
+					std::vector<Rate> rates(size);
+					for (Size k = 0; k<process->size(); ++k) {
+						rates[k] = path.value[k][location[i]];
+					}
+					std::vector<DiscountFactor> dis =
+						process->discountBond(rates);
+
+					Real npv = 0.0;
+					for (Size m = i; m < i + j; ++m) {
+						npv += (swapRate - rates[m])
+							* (process->accrualEndTimes()[m]
+							- process->accrualStartTimes()[m])*dis[m];
+					}
+					stat.add(std::max(npv, 0.0));
+				}
+
+				if (std::fabs(swaption->NPV() - stat.mean())
+					> stat.errorEstimate()*2.35)
+					BOOST_ERROR("Failed to reproduce swaption npv"
+					<< "\n    calculated: " << stat.mean()
+					<< "\n    expected:   " << swaption->NPV());
+			}
+		}
 	}
 }
 
 
-// --- Call the desired tests
-test_suite* MarketModelSmmCapletCalibrationTest::suite() {
-	test_suite* suite = BOOST_TEST_SUITE("SMM Caplet calibration test");
-#if !defined(QL_NO_UBLAS_SUPPORT)
+test_suite* LiborMarketModelTest::suite() {
+	test_suite* suite = BOOST_TEST_SUITE("Libor market model tests");
+
 	suite->add(QUANTLIB_TEST_CASE(
-		&MarketModelSmmCapletCalibrationTest::testFunction));
-#endif
+		&LiborMarketModelTest::testSimpleCovarianceModels));
+	suite->add(QUANTLIB_TEST_CASE(&LiborMarketModelTest::testCapletPricing));
+	suite->add(QUANTLIB_TEST_CASE(&LiborMarketModelTest::testSwaptionPricing));
+	suite->add(QUANTLIB_TEST_CASE(&LiborMarketModelTest::testCalibration));
+
 	return suite;
 }
+
