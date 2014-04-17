@@ -140,6 +140,22 @@ int main() {
 	
 	}
 
+	boost::shared_ptr<swapCurve> curve(					// building the curve object
+		new swapCurve(rateHelpers, calendar));
+
+	// rought check on yield curve points
+	std::cout << "yield curve value on 1M: " 
+			  << curve->zeroRate(1/12, Continuous)
+			  << std::endl;
+
+	std::cout << "yield curve value on 2M: "
+		<< curve->zeroRate(2 / 12, Continuous)
+		<< std::endl;
+
+	std::cout << "yield curve value on 3M: "
+		<< curve->zeroRate(3 / 12, Continuous)
+		<< std::endl;
+
 	std::vector<swaptionData> swaptions					// swaption data
 		= std::vector<swaptionData> {
 	
