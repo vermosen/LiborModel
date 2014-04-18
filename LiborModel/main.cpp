@@ -253,55 +253,6 @@ int main() {
 
 		boost::shared_ptr<IborIndex> libor = indexCreation();
 
-		// rought check on yield curve points
-		std::cout << "yield curve value on 1W: "
-			<< libor->forwardingTermStructure()->zeroRate(1.0 / 52, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 1M: "
-			<< libor->forwardingTermStructure()->zeroRate(1.0 / 12, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 2M: "
-			<< libor->forwardingTermStructure()->zeroRate(2.0 / 12, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 3M: "
-			<< libor->forwardingTermStructure()->zeroRate(3.0 / 12, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 4M: "
-			<< libor->forwardingTermStructure()->zeroRate(4.0 / 12, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 5M: "
-			<< libor->forwardingTermStructure()->zeroRate(5.0 / 12, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 6M: "
-			<< libor->forwardingTermStructure()->zeroRate(.5, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 1Y: "
-			<< libor->forwardingTermStructure()->zeroRate(1.0, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 2Y: "
-			<< libor->forwardingTermStructure()->zeroRate(2.0, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 3Y: "
-			<< libor->forwardingTermStructure()->zeroRate(3.0, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 5Y: "
-			<< libor->forwardingTermStructure()->zeroRate(5.0, Continuous)
-			<< std::endl;
-
-		std::cout << "yield curve value on 10Y: "
-			<< libor->forwardingTermStructure()->zeroRate(10.0, Continuous)
-			<< std::endl;
-
 		std::vector<swaptionData> swaptions					// swaption data
 			= std::vector<swaptionData> {
 
@@ -469,39 +420,48 @@ int main() {
 		// create diagnostic file
 		{
 
-			// build file path
-			std::string fileStr("C:/Temp/liborModel_");
+			std::string fileStr("C:/Temp/liborModel_");			// build file path
 			fileStr.append(boost::posix_time::to_iso_string(
 				boost::posix_time::second_clock::local_time()));
 			fileStr.append(".csv");
 
-			// csv builder
-			utilities::csvBuilder file(fileStr);
+			utilities::csvBuilder file(fileStr);				// csv builder
 
-			// optimization results
-			file.add(std::string("calibration result:"), 1, 1);	// calibration result
+			Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
+
+			for (int i = 0; i < size_; i++) {
+
+				times[i] = 0.25*(i + 1);
+				rates[i] = libor->forwardingTermStructure()->zeroRate(
+					times[i], Continous);
+
+			}
+
+			file.add("times", 1, 1); file.add("rates", 1, 2);	// adds the yield curve data
+			file.add( times , 2, 1); file.add( rates , 2, 2);
+			file.add(std::string("calibration result:"), 1, 4);	// calibration result
 
 			switch (model->endCriteria()) {						// different case, could use a factory...
 
-			case EndCriteria::StationaryPoint:
-				file.add(std::string("stationnary point"), 1, 2);
-				break;
+				case EndCriteria::StationaryPoint:
+					file.add(std::string("stationnary point"), 2, 4);
+					break;
 
-			case EndCriteria::MaxIterations:
-				file.add(std::string("Max Iterations reached"), 1, 2);
-				break;
+				case EndCriteria::MaxIterations:
+					file.add(std::string("Max Iterations reached"), 2, 4);
+					break;
 
-			case EndCriteria::StationaryFunctionValue:
-				file.add("Stationary Function Value reached", 1, 2);
-				break;
+				case EndCriteria::StationaryFunctionValue:
+					file.add("Stationary Function Value reached", 2, 4);
+					break;
 
-			default:
-				file.add(std::string("unknown result"), 1, 2);
+				default:
+					file.add(std::string("unknown result"), 2, 4);
 			}
 
 			// swaption volatility matrix
-			file.add("correlation matrix at time zero", 2, 1);
-			file.add(corrModel->correlation(0), 2, 2);
+			file.add("correlation matrix at time zero", 1, 6);
+			file.add(corrModel->correlation(0), 2, 6);
 
 		}
 
