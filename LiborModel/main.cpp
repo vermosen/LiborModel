@@ -11,53 +11,20 @@
 #include <ql/quantlib.hpp>
 #include <ql/utilities/csvBuilder.hpp>
 
-
 using namespace QuantLib;
-
-namespace {
-
-	/* create a libor index */
-	boost::shared_ptr<IborIndex> makeIndex(std::vector<Date> dates,
-		std::vector<Rate> rates) {
-		DayCounter dayCounter = Actual360();
-
-		// notice the relinkable index...
-		RelinkableHandle<YieldTermStructure> termStructure;
-
-		boost::shared_ptr<IborIndex> index(new Euribor6M(termStructure));
-
-		Date todaysDate =
-			index->fixingCalendar().adjust(Date(4, September, 2005));
-		Settings::instance().evaluationDate() = todaysDate;
-
-		dates[0] = index->fixingCalendar().advance(todaysDate,
-			index->fixingDays(), Days);
-
-		termStructure.linkTo(boost::shared_ptr<YieldTermStructure>(
-			new ZeroCurve(dates, rates, dayCounter)));
-
-		return index;
-	}
-
-	/* feed an index with data */
-	boost::shared_ptr<IborIndex> makeIndex() {
-		std::vector<Date> dates;
-		std::vector<Rate> rates;
-		dates.push_back(Date(4, September, 2005));
-		dates.push_back(Date(4, September, 2018));
-		rates.push_back(0.039);
-		rates.push_back(0.041);
-
-		return makeIndex(dates, rates);
-	}
-
-}
 
 struct depositData {
 
 	Real   quote_;
 	Natural settlementDays_;
 	Period maturity_;
+
+};
+
+struct futureData {
+
+	Real   price_;
+	std::string futureCode_;
 
 };
 
@@ -71,252 +38,384 @@ struct swaptionData {
 
 int main() {
 
-	std::cout << "Testing calibration of a Libor forward model..." << std::endl;
+	try
+	{
 
-	SavedSettings backup;
+		std::cout << "Testing calibration of a Libor forward model..."
+			<< std::endl;
 
-	const Size size = 20;								// 20 semestrers
-	const Real tolerance = 8e-3;						// tolerance
+		/* basic settings */
+		SavedSettings backup;
 
-	const Calendar calendar								// pricing calendar
-		= JointCalendar(
-		UnitedStates(UnitedStates::Settlement),
-		UnitedKingdom(UnitedKingdom::Settlement));
+		const Size size_ = 20;								// 20 semestrers
+		const Real tolerance_ = 8e-3;						// tolerance
+		const Real convexity_ = 0.0;						// convexity adjustment for future prices
+		const Real meanReverting_ = 0.0;					// mean reversion for future prices
 
-	const Date pricingDate = Date(16, April, 2014);		// pricing date
+		const Calendar calendar								// pricing calendar
+			= JointCalendar(
+			UnitedStates(UnitedStates::Settlement),
+			UnitedKingdom(UnitedKingdom::Settlement));
 
-	QuantLib::Settings::instance().evaluationDate()		// set global evaluation date
-		= pricingDate;
+		const Date pricingDate = Date(16, April, 2014);		// pricing date
 
-	std::vector<boost::shared_ptr<RateHelper> > rateHelpers;
+		Settings::instance().evaluationDate()				// set global evaluation date
+			= pricingDate;
 
-	std::vector<depositData> rates						// yield data
-		= std::vector<depositData> {
-	
-			{ .09070, 0, Period(1, Days) },
-			{ .14250, 1, Period(2, Days) },
-			{ .12150, 2, Period(1, Weeks) },
-			{ .15200, 2, Period(1, Months) },
-			{ .19300, 2, Period(2, Months) },
-			{ .22785, 2, Period(3, Months) }
-	
-	};
+		/* create the yield term structure */
+		boost::shared_ptr<RelinkableHandle<YieldTermStructure> > ts(
+			new RelinkableHandle<YieldTermStructure>());
 
-	
-	for (std::vector<depositData>::const_iterator It = rates.cbegin();
-		It != rates.cend(); It++) {
-	
-		// settlement and maturity dates
-		Date settlement = calendar.advance(
-			pricingDate, Period(It->settlementDays_, Days));
-		Date maturity = calendar.advance(
-			settlement, It->maturity_);
+		boost::shared_ptr<IborIndex> libor(					// libor index associated
+			new USDLibor(
+			Period(3, Months),
+			*ts));
 
-		// creating the deposit
-		boost::shared_ptr<QuantLib::deposit> myDepositPtr(
-			new deposit(
+		libor->addFixing(Date(16, April, 2014), .0022785);	// add a few fixings
+		libor->addFixing(Date(15, April, 2014), .0022635);
+		libor->addFixing(Date(14, April, 2014), .0022865);
+		libor->addFixing(Date(11, April, 2014), .0022645);
+
+		// the rate helpers
+		std::vector<boost::shared_ptr<RateHelper> > rateHelpers;
+
+		std::vector<depositData> depositRates				// deposit data
+			= std::vector<depositData>
+		{
+
+			{ .0009070, 0, Period(1, Days) },
+			{ .0014250, 1, Period(2, Days) },
+			{ .0012150, 2, Period(1, Weeks) },
+			{ .0015200, 2, Period(1, Months) },
+			{ .0019300, 2, Period(2, Months) },
+			{ .0022785, 2, Period(3, Months) }
+
+		};
+
+		std::vector<futureData> futureRates					// future data
+			= std::vector<futureData>
+		{
+
+			{ 99.7725, "EDK4" },
+			{ 99.7700, "EDM4" },
+			{ 99.7650, "EDN4" },
+			{ 99.7600, "EDQ4" },
+			{ 99.7600, "EDU4" },
+			{ 99.7450, "EDV4" },
+			{ 99.7250, "EDZ4" },
+			{ 99.6300, "EDH5" },
+			{ 99.4550, "EDM5" },
+			{ 99.2250, "EDU5" },
+			{ 98.9450, "EDZ5" },
+			{ 98.6450, "EDH6" },
+			{ 98.3400, "EDM6" },
+			{ 98.0500, "EDU6" },
+			{ 97.7850, "EDZ6" },
+			{ 97.5600, "EDU7" }
+
+		};
+
+		for (std::vector<depositData>::const_iterator It = depositRates.cbegin();
+			It != depositRates.cend(); It++)
+		{
+
+			// settlement and maturity dates
+			Date settlement = calendar.advance(
+				pricingDate, Period(It->settlementDays_, Days));
+			Date maturity = calendar.advance(
+				settlement, It->maturity_);
+
+			// creating the deposit
+			boost::shared_ptr<QuantLib::deposit> myDepositPtr(
+				new deposit(
 				pricingDate,
 				maturity,
 				calendar,
 				It->settlementDays_));
 
-		Handle<Quote> quoteHandler(						// quote handle
-			boost::shared_ptr<Quote>(
+			Handle<Quote> quoteHandler(						// quote handle
+				boost::shared_ptr<Quote>(
 				new SimpleQuote(
-					myDepositPtr->cleanPrice(
-					It->quote_,
-					Actual360(),
-					Simple,
-					Once,
-					Unadjusted,
-					settlement))));
+				myDepositPtr->cleanPrice(
+				It->quote_,
+				Actual360(),
+				Simple,
+				Once,
+				Unadjusted,
+				settlement))));
 
 
-		rateHelpers.push_back(							// insert RateHelper
-			boost::shared_ptr<RateHelper>(new
+			rateHelpers.push_back(							// insert RateHelper
+				boost::shared_ptr<RateHelper>(new
 				depositBootstrapHelper(
-					quoteHandler,
-					myDepositPtr)));
-	
-	}
+				quoteHandler,
+				myDepositPtr)));
 
-	boost::shared_ptr<swapCurve> curve(					// building the curve object
-		new swapCurve(rateHelpers, calendar));
+		}
 
-	// rought check on yield curve points
-	std::cout << "yield curve value on 1M: " 
-			  << curve->zeroRate(1/12, Continuous)
-			  << std::endl;
+		for (std::vector<futureData>::const_iterator It = futureRates.cbegin();
+			It != futureRates.cend(); It++)
+		{
 
-	std::cout << "yield curve value on 2M: "
-		<< curve->zeroRate(2 / 12, Continuous)
-		<< std::endl;
+			Handle<Quote> convexityHandle(					// convexity adjustment
+				boost::shared_ptr<Quote>(
+				new SimpleQuote(convexity_)));
 
-	std::cout << "yield curve value on 3M: "
-		<< curve->zeroRate(3 / 12, Continuous)
-		<< std::endl;
+			Handle<Quote> meanRevertingHandle(				// mean reverting
+				boost::shared_ptr<Quote>(
+				new SimpleQuote(meanReverting_)));
 
-	std::vector<swaptionData> swaptions					// swaption data
-		= std::vector<swaptionData> {
-	
-		{ 0.170595, Period(1, Years), Period(1, Years) },
-		{ 0.166844, Period(1, Years), Period(2, Years) },
-		{ 0.158306, Period(1, Years), Period(3, Years) },
-		{ 0.136930, Period(1, Years), Period(4, Years) },
-		{ 0.126833, Period(1, Years), Period(5, Years) },
-		{ 0.118135, Period(1, Years), Period(6, Years) },
-		{ 0.175963, Period(1, Years), Period(7, Years) },
-		{ 0.166359, Period(1, Years), Period(8, Years) },
-		{ 0.155203, Period(1, Years), Period(9, Years) },
-		{ 0.170595, Period(2, Years), Period(1, Years) },
-		{ 0.166844, Period(2, Years), Period(2, Years) },
-		{ 0.158306, Period(2, Years), Period(3, Years) },
-		{ 0.136930, Period(2, Years), Period(4, Years) },
-		{ 0.126833, Period(2, Years), Period(5, Years) },
-		{ 0.118135, Period(2, Years), Period(6, Years) },
-		{ 0.175963, Period(2, Years), Period(7, Years) },
-		{ 0.166359, Period(2, Years), Period(8, Years) },
-		{ 0.170595, Period(3, Years), Period(1, Years) },
-		{ 0.166844, Period(3, Years), Period(2, Years) },
-		{ 0.158306, Period(3, Years), Period(3, Years) },
-		{ 0.136930, Period(3, Years), Period(4, Years) },
-		{ 0.126833, Period(3, Years), Period(5, Years) },
-		{ 0.118135, Period(3, Years), Period(6, Years) },
-		{ 0.175963, Period(3, Years), Period(7, Years) },
-		{ 0.170595, Period(4, Years), Period(1, Years) },
-		{ 0.166844, Period(4, Years), Period(2, Years) },
-		{ 0.158306, Period(4, Years), Period(3, Years) },
-		{ 0.136930, Period(4, Years), Period(4, Years) },
-		{ 0.126833, Period(4, Years), Period(5, Years) },
-		{ 0.118135, Period(4, Years), Period(6, Years) },
-		{ 0.175963, Period(5, Years), Period(1, Years) },
-		{ 0.166844, Period(5, Years), Period(2, Years) },
-		{ 0.158306, Period(5, Years), Period(3, Years) },
-		{ 0.136930, Period(5, Years), Period(4, Years) },
-		{ 0.126833, Period(5, Years), Period(5, Years) },
-		{ 0.175963, Period(6, Years), Period(1, Years) },
-		{ 0.166844, Period(6, Years), Period(2, Years) },
-		{ 0.158306, Period(6, Years), Period(3, Years) },
-		{ 0.136930, Period(6, Years), Period(4, Years) },
-		{ 0.175963, Period(7, Years), Period(1, Years) },
-		{ 0.166844, Period(7, Years), Period(2, Years) },
-		{ 0.158306, Period(7, Years), Period(3, Years) },
-		{ 0.175963, Period(8, Years), Period(1, Years) },
-		{ 0.166844, Period(8, Years), Period(2, Years) },
-		{ 0.166844, Period(9, Years), Period(1, Years) }
+			Handle<Quote> futurePriceHandle(				// price
+				boost::shared_ptr<Quote>(
+				new SimpleQuote(It->price_)));
 
-	};
+			Date futureDate = IMM::date(					// IMM date
+				It->futureCode_.substr(2, 2),
+				pricingDate);
 
-	boost::shared_ptr<IborIndex> index = makeIndex();
-	boost::shared_ptr<LiborForwardModelProcess> process(
-		new LiborForwardModelProcess(size, index));
-	Handle<YieldTermStructure> termStructure = index->forwardingTermStructure();
+			Handle<Quote> convexityAdjustedQuoteHendle(		// convexity adjustement
+				boost::shared_ptr<Quote>(
+				new futuresConvexityAdjustmentQuote2(
+				libor,
+				futureDate,
+				futurePriceHandle,
+				convexityHandle,
+				meanRevertingHandle,
+				pricingDate)));
 
-	// set-up the model
-	boost::shared_ptr<LmVolatilityModel> volaModel(
-		new LmExtLinearExponentialVolModel(process->fixingTimes(),
-		0.5, 0.6, 0.1, 0.1));
+			rateHelpers.push_back(							// helper
+				boost::shared_ptr<FuturesRateHelper>(
+				new FuturesRateHelper(
+				convexityAdjustedQuoteHendle,
+				futureDate,
+				libor,
+				convexityAdjustedQuoteHendle)));
 
-	boost::shared_ptr<LmCorrelationModel> corrModel(
-		new LmLinearExponentialCorrelationModel(size, 0.5, 0.8));
+		}
 
-	boost::shared_ptr<LiborForwardModel> model(
-		new LiborForwardModel(process, volaModel, corrModel));
+		boost::shared_ptr<swapCurve> curve(					// building the curve object
+			new swapCurve(rateHelpers, calendar, 10e-12));
 
-	Size swapVolIndex = 0;
-	DayCounter dayCounter = index->forwardingTermStructure()->dayCounter();
+		ts->linkTo(curve);									// finally relink the index
 
-	// set-up calibration helper
-	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
+		// rought check on yield curve points
+		std::cout << "yield curve value on 1W: "
+			<< curve->zeroRate(1.0 / 52, Continuous)
+			<< std::endl;
 
-	Size i;
+		std::cout << "yield curve value on 1M: "
+			<< curve->zeroRate(1.0 / 12, Continuous)
+			<< std::endl;
 
-	for (i = 0; i < swaptions.size(); i++) {
-	
-		Handle<Quote> swaptionVol(
-			boost::shared_ptr<Quote>(
-			new SimpleQuote(swaptions[i].volatility_)));
+		std::cout << "yield curve value on 2M: "
+			<< curve->zeroRate(2.0 / 12, Continuous)
+			<< std::endl;
 
-		boost::shared_ptr<CalibrationHelper> swaptionHelper(
-			new SwaptionHelper(swaptions[i].maturity_, 
-				swaptions[i].lenght_, swaptionVol, index,
-				index->tenor(), dayCounter,
-				index->dayCounter(),
+		std::cout << "yield curve value on 3M: "
+			<< curve->zeroRate(3.0 / 12, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 4M: "
+			<< curve->zeroRate(4.0 / 12, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 5M: "
+			<< curve->zeroRate(5.0 / 12, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 6M: "
+			<< curve->zeroRate(6.0 / 12, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 1Y: "
+			<< curve->zeroRate(12.0 / 12, Continuous)
+			<< std::endl;
+
+		std::vector<swaptionData> swaptions					// swaption data
+			= std::vector<swaptionData> {
+
+				{ 0.170595, Period(1, Years), Period(1, Years) },
+				{ 0.166844, Period(1, Years), Period(2, Years) },
+				{ 0.158306, Period(1, Years), Period(3, Years) },
+				{ 0.136930, Period(1, Years), Period(4, Years) },
+				{ 0.126833, Period(1, Years), Period(5, Years) },
+				{ 0.118135, Period(1, Years), Period(6, Years) },
+				{ 0.175963, Period(1, Years), Period(7, Years) },
+				{ 0.166359, Period(1, Years), Period(8, Years) },
+				{ 0.155203, Period(1, Years), Period(9, Years) },
+				{ 0.170595, Period(2, Years), Period(1, Years) },
+				{ 0.166844, Period(2, Years), Period(2, Years) },
+				{ 0.158306, Period(2, Years), Period(3, Years) },
+				{ 0.136930, Period(2, Years), Period(4, Years) },
+				{ 0.126833, Period(2, Years), Period(5, Years) },
+				{ 0.118135, Period(2, Years), Period(6, Years) },
+				{ 0.175963, Period(2, Years), Period(7, Years) },
+				{ 0.166359, Period(2, Years), Period(8, Years) },
+				{ 0.170595, Period(3, Years), Period(1, Years) },
+				{ 0.166844, Period(3, Years), Period(2, Years) },
+				{ 0.158306, Period(3, Years), Period(3, Years) },
+				{ 0.136930, Period(3, Years), Period(4, Years) },
+				{ 0.126833, Period(3, Years), Period(5, Years) },
+				{ 0.118135, Period(3, Years), Period(6, Years) },
+				{ 0.175963, Period(3, Years), Period(7, Years) },
+				{ 0.170595, Period(4, Years), Period(1, Years) },
+				{ 0.166844, Period(4, Years), Period(2, Years) },
+				{ 0.158306, Period(4, Years), Period(3, Years) },
+				{ 0.136930, Period(4, Years), Period(4, Years) },
+				{ 0.126833, Period(4, Years), Period(5, Years) },
+				{ 0.118135, Period(4, Years), Period(6, Years) },
+				{ 0.175963, Period(5, Years), Period(1, Years) },
+				{ 0.166844, Period(5, Years), Period(2, Years) },
+				{ 0.158306, Period(5, Years), Period(3, Years) },
+				{ 0.136930, Period(5, Years), Period(4, Years) },
+				{ 0.126833, Period(5, Years), Period(5, Years) },
+				{ 0.175963, Period(6, Years), Period(1, Years) },
+				{ 0.166844, Period(6, Years), Period(2, Years) },
+				{ 0.158306, Period(6, Years), Period(3, Years) },
+				{ 0.136930, Period(6, Years), Period(4, Years) },
+				{ 0.175963, Period(7, Years), Period(1, Years) },
+				{ 0.166844, Period(7, Years), Period(2, Years) },
+				{ 0.158306, Period(7, Years), Period(3, Years) },
+				{ 0.175963, Period(8, Years), Period(1, Years) },
+				{ 0.166844, Period(8, Years), Period(2, Years) },
+				{ 0.166844, Period(9, Years), Period(1, Years) }
+
+		};
+
+
+		Handle<YieldTermStructure> termStructure = libor->forwardingTermStructure();
+
+		// set up the process
+		boost::shared_ptr<LiborForwardModelProcess> process(
+			new LiborForwardModelProcess(size_, libor));
+
+		// set-up the model
+		boost::shared_ptr<LmVolatilityModel> volaModel(
+			new LmExtLinearExponentialVolModel(process->fixingTimes(),
+			0.5, 0.6, 0.1, 0.1));
+
+		boost::shared_ptr<LmCorrelationModel> corrModel(
+			new LmLinearExponentialCorrelationModel(size_, 0.5, 0.8));
+
+		boost::shared_ptr<LiborForwardModel> model(
+			new LiborForwardModel(process, volaModel, corrModel));
+
+		Size swapVolIndex = 0;
+		DayCounter dayCounter = libor->forwardingTermStructure()->dayCounter();
+
+		// set-up calibration helper
+		std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
+
+		Size i;
+
+		for (i = 0; i < swaptions.size(); i++) {
+
+			Handle<Quote> swaptionVol(
+				boost::shared_ptr<Quote>(
+				new SimpleQuote(swaptions[i].volatility_)));
+
+			boost::shared_ptr<CalibrationHelper> swaptionHelper(
+				new SwaptionHelper(swaptions[i].maturity_,
+				swaptions[i].lenght_, swaptionVol, libor,
+				libor->tenor(), dayCounter,
+				libor->dayCounter(),
 				termStructure,
 				CalibrationHelper::ImpliedVolError));
 
-		swaptionHelper->setPricingEngine(
-			boost::shared_ptr<PricingEngine>(
-			new LfmSwaptionEngine(model, termStructure)));
+			swaptionHelper->setPricingEngine(
+				boost::shared_ptr<PricingEngine>(
+				new LfmSwaptionEngine(model, termStructure)));
 
-		calibrationHelper.push_back(swaptionHelper);
+			calibrationHelper.push_back(swaptionHelper);
 
-	}
+		}
 
 #ifdef _DEBUG
 
-	LevenbergMarquardt om(1e-5, 1e-5, 1e-5);
-	model->calibrate(calibrationHelper, om, EndCriteria(100, 20, 1e-5, 1e-5, 1e-6));
+		LevenbergMarquardt om(1e-5, 1e-5, 1e-5);
+		model->calibrate(calibrationHelper, om, EndCriteria(100, 20, 1e-5, 1e-5, 1e-6));
 
 #else
 
-	LevenbergMarquardt om(1e-6, 1e-6, 1e-6);
-	model->calibrate(calibrationHelper, om, EndCriteria(500, 100, 1e-6, 1e-6, 1e-6));
+		LevenbergMarquardt om(1e-6, 1e-6, 1e-6);
+		model->calibrate(calibrationHelper, om, EndCriteria(500, 100, 1e-6, 1e-6, 1e-6));
 
 #endif
 
-	// measure the calibration error
-	Real calculated = 0.0;
-	for (i = 0; i<calibrationHelper.size(); ++i) {
-		Real diff = calibrationHelper[i]->calibrationError();
-		calculated += diff * diff;
-	}
-
-	if (std::sqrt(calculated) > tolerance)
-		std::cout << "Failed to calibrate libor forward model"
-		<< "\n    calculated diff: " << std::sqrt(calculated)
-		<< "\n    expected : smaller than  " << tolerance << std::endl;
-
-	// create diagnostic file
-	{
-		
-		// build file path
-		std::string fileStr("C:/Temp/liborModel_");
-		fileStr.append(boost::posix_time::to_iso_string(
-			boost::posix_time::second_clock::local_time()));
-		fileStr.append(".csv");
-
-		// csv builder
-		utilities::csvBuilder file(fileStr);
-
-		// optimization results
-		file.add(std::string("calibration result:"), 1, 1);	// calibration result
-		
-		switch (model->endCriteria()) {						// different case, could use a factory...
-
-		case EndCriteria::StationaryPoint:
-			file.add(std::string("stationnary point"), 1, 2);
-			break;
-
-		case EndCriteria::MaxIterations:
-			file.add(std::string("Max Iterations reached"), 1, 2);
-			break;
-
-		case EndCriteria::StationaryFunctionValue:
-			file.add("Stationary Function Value reached", 1, 2);
-			break;
-
-		default:
-			file.add(std::string("unknown result"), 1, 2);
+		// measure the calibration error
+		Real calculated = 0.0;
+		for (i = 0; i<calibrationHelper.size(); ++i) {
+			Real diff = calibrationHelper[i]->calibrationError();
+			calculated += diff * diff;
 		}
 
-		// swaption volatility matrix
-		file.add("correlation matrix at time zero", 2, 1);
-		file.add(corrModel->correlation(0), 2, 2);
-		
+		if (std::sqrt(calculated) > tolerance_)
+			std::cout << "Failed to calibrate libor forward model"
+			<< "\n    calculated diff: " << std::sqrt(calculated)
+			<< "\n    expected : smaller than  " << tolerance_ << std::endl;
+
+		// create diagnostic file
+		{
+
+			// build file path
+			std::string fileStr("C:/Temp/liborModel_");
+			fileStr.append(boost::posix_time::to_iso_string(
+				boost::posix_time::second_clock::local_time()));
+			fileStr.append(".csv");
+
+			// csv builder
+			utilities::csvBuilder file(fileStr);
+
+			// optimization results
+			file.add(std::string("calibration result:"), 1, 1);	// calibration result
+
+			switch (model->endCriteria()) {						// different case, could use a factory...
+
+			case EndCriteria::StationaryPoint:
+				file.add(std::string("stationnary point"), 1, 2);
+				break;
+
+			case EndCriteria::MaxIterations:
+				file.add(std::string("Max Iterations reached"), 1, 2);
+				break;
+
+			case EndCriteria::StationaryFunctionValue:
+				file.add("Stationary Function Value reached", 1, 2);
+				break;
+
+			default:
+				file.add(std::string("unknown result"), 1, 2);
+			}
+
+			// swaption volatility matrix
+			file.add("correlation matrix at time zero", 2, 1);
+			file.add(corrModel->correlation(0), 2, 2);
+
+		}
+
+		system("pause");
+		return 0;
+	
 	}
+	catch (std::exception & e){
+	
+		std::cout << "an error occured: "
+				  << std::endl;
 
-	system("pause");
-	return 0;
+		std::cout << e.what() 
+				  << std::endl;
 
+		system("pause");
+		return 1;
+	
+	}
+	catch (...){
+
+		std::cout << "an unknown error occured..."
+			<< std::endl;
+
+		system("pause");
+		return 1;
+
+	}
 }
