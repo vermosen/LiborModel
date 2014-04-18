@@ -89,9 +89,9 @@ int main() {
 			= std::vector<depositData>
 		{
 
-			{ .0009070, 0, Period(1, Days) },
-			{ .0014250, 1, Period(2, Days) },
-			{ .0012150, 2, Period(1, Weeks) },
+			{ .0009070, 0, Period(1, Days  ) },
+			{ .0014250, 1, Period(2, Days  ) },
+			{ .0012150, 2, Period(1, Weeks ) },
 			{ .0015200, 2, Period(1, Months) },
 			{ .0019300, 2, Period(2, Months) }/*,
 			{ .0022785, 2, Period(3, Months) }*/
@@ -133,7 +133,7 @@ int main() {
 			{ .0262750, Period(9 , Years) },
 			{ .0275070, Period(10, Years) },
 			{ .0286800, Period(11, Years) },
-			{ .0286800, Period(12, Years) }
+			{ .0296100, Period(12, Years) }
 
 		};
 
@@ -216,6 +216,29 @@ int main() {
 
 		}
 
+		for (std::vector<swapData>::const_iterator It = swapRates.cbegin(); 
+			It != swapRates.cend(); It++) 
+		{
+		
+						
+			QuantLib::Handle<QuantLib::Quote> myHandle(		// creates the rate handle
+				boost::shared_ptr<QuantLib::Quote>(
+				new QuantLib::SimpleQuote(It->fairRate_)));
+		
+
+			rateHelpers.push_back(
+				boost::shared_ptr<QuantLib::RateHelper>(new
+				QuantLib::SwapRateHelper(
+					myHandle,
+					It->maturity_,
+					calendar,
+					Semiannual,
+					ModifiedFollowing,
+					ActualActual(),
+					libor)));
+
+		}
+
 		boost::shared_ptr<swapCurve> curve(					// building the curve object
 			new swapCurve(rateHelpers, calendar, 10e-12));
 
@@ -262,54 +285,104 @@ int main() {
 			<< curve->zeroRate(3.0, Continuous)
 			<< std::endl;
 
+		std::cout << "yield curve value on 5Y: "
+			<< curve->zeroRate(5.0, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 10Y: "
+			<< curve->zeroRate(10.0, Continuous)
+			<< std::endl;
+
 		std::vector<swaptionData> swaptions					// swaption data
 			= std::vector<swaptionData> {
 
-				{ 0.170595, Period(1, Years), Period(1, Years) },
-				{ 0.166844, Period(1, Years), Period(2, Years) },
-				{ 0.158306, Period(1, Years), Period(3, Years) },
-				{ 0.136930, Period(1, Years), Period(4, Years) },
-				{ 0.126833, Period(1, Years), Period(5, Years) },
-				{ 0.118135, Period(1, Years), Period(6, Years) },
-				{ 0.175963, Period(1, Years), Period(7, Years) },
-				{ 0.166359, Period(1, Years), Period(8, Years) },
-				{ 0.155203, Period(1, Years), Period(9, Years) },
-				{ 0.170595, Period(2, Years), Period(1, Years) },
-				{ 0.166844, Period(2, Years), Period(2, Years) },
-				{ 0.158306, Period(2, Years), Period(3, Years) },
-				{ 0.136930, Period(2, Years), Period(4, Years) },
-				{ 0.126833, Period(2, Years), Period(5, Years) },
-				{ 0.118135, Period(2, Years), Period(6, Years) },
-				{ 0.175963, Period(2, Years), Period(7, Years) },
-				{ 0.166359, Period(2, Years), Period(8, Years) },
-				{ 0.170595, Period(3, Years), Period(1, Years) },
-				{ 0.166844, Period(3, Years), Period(2, Years) },
-				{ 0.158306, Period(3, Years), Period(3, Years) },
-				{ 0.136930, Period(3, Years), Period(4, Years) },
-				{ 0.126833, Period(3, Years), Period(5, Years) },
-				{ 0.118135, Period(3, Years), Period(6, Years) },
-				{ 0.175963, Period(3, Years), Period(7, Years) },
-				{ 0.170595, Period(4, Years), Period(1, Years) },
-				{ 0.166844, Period(4, Years), Period(2, Years) },
-				{ 0.158306, Period(4, Years), Period(3, Years) },
-				{ 0.136930, Period(4, Years), Period(4, Years) },
-				{ 0.126833, Period(4, Years), Period(5, Years) },
-				{ 0.118135, Period(4, Years), Period(6, Years) },
-				{ 0.175963, Period(5, Years), Period(1, Years) },
-				{ 0.166844, Period(5, Years), Period(2, Years) },
-				{ 0.158306, Period(5, Years), Period(3, Years) },
-				{ 0.136930, Period(5, Years), Period(4, Years) },
-				{ 0.126833, Period(5, Years), Period(5, Years) },
-				{ 0.175963, Period(6, Years), Period(1, Years) },
-				{ 0.166844, Period(6, Years), Period(2, Years) },
-				{ 0.158306, Period(6, Years), Period(3, Years) },
-				{ 0.136930, Period(6, Years), Period(4, Years) },
-				{ 0.175963, Period(7, Years), Period(1, Years) },
-				{ 0.166844, Period(7, Years), Period(2, Years) },
-				{ 0.158306, Period(7, Years), Period(3, Years) },
-				{ 0.175963, Period(8, Years), Period(1, Years) },
-				{ 0.166844, Period(8, Years), Period(2, Years) },
-				{ 0.166844, Period(9, Years), Period(1, Years) }
+				{ 50.200, Period(1, Months), Period(1, Years) },
+				{ 54.475, Period(3, Months), Period(1, Years) },
+				{ 63.350, Period(6, Months), Period(1, Years) },
+				{ 68.650, Period(1, Years), Period(1, Years) },
+				{ 49.850, Period(2, Years), Period(1, Years) },
+				{ 38.500, Period(3, Years), Period(1, Years) },
+				{ 31.900, Period(4, Years), Period(1, Years) },
+				{ 28.500, Period(5, Years), Period(1, Years) },
+				{ 26.500, Period(6, Years), Period(1, Years) },
+				{ 24.625, Period(7, Years), Period(1, Years) },
+				{ 23.500, Period(8, Years), Period(1, Years) },
+				{ 22.550, Period(9, Years), Period(1, Years) },
+				{ 21.150, Period(10, Years), Period(1, Years) },
+				{ 60.950, Period(1, Months), Period(2, Years) },
+				{ 55.700, Period(3, Months), Period(2, Years) },
+				{ 58.100, Period(6, Months), Period(2, Years) },
+				{ 56.550, Period(1, Years), Period(2, Years) },
+				{ 42.600, Period(2, Years), Period(2, Years) },
+				{ 34.300, Period(3, Years), Period(2, Years) },
+				{ 29.400, Period(4, Years), Period(2, Years) },
+				{ 26.900, Period(5, Years), Period(2, Years) },
+				{ 25.050, Period(6, Years), Period(2, Years) },
+				{ 23.800, Period(7, Years), Period(2, Years) },
+				{ 22.700, Period(8, Years), Period(2, Years) },
+				{ 21.600, Period(9, Years), Period(2, Years) },
+				{ 51.050, Period(1, Months), Period(3, Years) },
+				{ 48.300, Period(3, Months), Period(3, Years) },
+				{ 48.900, Period(6, Months), Period(3, Years) },
+				{ 47.000, Period(1, Years), Period(3, Years) },
+				{ 37.000, Period(2, Years), Period(3, Years) },
+				{ 31.275, Period(3, Years), Period(3, Years) },
+				{ 27.650, Period(4, Years), Period(3, Years) },
+				{ 25.650, Period(5, Years), Period(3, Years) },
+				{ 24.200, Period(6, Years), Period(3, Years) },
+				{ 23.050, Period(7, Years), Period(3, Years) },
+				{ 22.050, Period(8, Years), Period(3, Years) },
+				{ 40.800, Period(1, Months), Period(4, Years) },
+				{ 40.225, Period(3, Months), Period(4, Years) },
+				{ 40.200, Period(6, Months), Period(4, Years) },
+				{ 39.300, Period(1, Years), Period(4, Years) },
+				{ 32.800, Period(2, Years), Period(4, Years) },
+				{ 28.925, Period(3, Years), Period(4, Years) },
+				{ 26.150, Period(4, Years), Period(4, Years) },
+				{ 24.650, Period(5, Years), Period(4, Years) },
+				{ 23.500, Period(6, Years), Period(4, Years) },
+				{ 22.350, Period(7, Years), Period(4, Years) },
+				{ 36.025, Period(1, Months), Period(5, Years) },
+				{ 35.600, Period(3, Months), Period(5, Years) },
+				{ 35.425, Period(6, Months), Period(5, Years) },
+				{ 34.250, Period(1, Years), Period(5, Years) },
+				{ 29.850, Period(2, Years), Period(5, Years) },
+				{ 26.900, Period(3, Years), Period(5, Years) },
+				{ 24.925, Period(4, Years), Period(5, Years) },
+				{ 23.700, Period(5, Years), Period(5, Years) },
+				{ 22.750, Period(6, Years), Period(5, Years) },
+				{ 30.800, Period(1, Months), Period(6, Years) },
+				{ 30.700, Period(3, Months), Period(6, Years) },
+				{ 31.200, Period(6, Months), Period(6, Years) },
+				{ 30.750, Period(1, Years), Period(6, Years) },
+				{ 27.850, Period(2, Years), Period(6, Years) },
+				{ 25.775, Period(3, Years), Period(6, Years) },
+				{ 24.125, Period(4, Years), Period(6, Years) },
+				{ 23.100, Period(5, Years), Period(6, Years) },
+				{ 27.600, Period(1, Months), Period(7, Years) },
+				{ 27.750, Period(3, Months), Period(7, Years) },
+				{ 28.350, Period(6, Months), Period(7, Years) },
+				{ 28.200, Period(1, Years), Period(7, Years) },
+				{ 26.400, Period(2, Years), Period(7, Years) },
+				{ 24.750, Period(3, Years), Period(7, Years) },
+				{ 23.400, Period(4, Years), Period(7, Years) },
+				{ 25.250, Period(1, Months), Period(8, Years) },
+				{ 25.450, Period(3, Months), Period(8, Years) },
+				{ 26.000, Period(6, Months), Period(8, Years) },
+				{ 26.250, Period(1, Years), Period(8, Years) },
+				{ 25.225, Period(2, Years), Period(8, Years) },
+				{ 23.875, Period(3, Years), Period(8, Years) },
+				{ 23.575, Period(1, Months), Period(9, Years) },
+				{ 23.575, Period(3, Months), Period(9, Years) },
+				{ 24.600, Period(6, Months), Period(9, Years) },
+				{ 24.800, Period(1, Years), Period(9, Years) },
+				{ 24.150, Period(2, Years), Period(9, Years) },
+				{ 22.275, Period(1, Months), Period(10, Years) },
+				{ 22.125, Period(3, Months), Period(10, Years) },
+				{ 23.300, Period(6, Months), Period(10, Years) },
+				{ 23.600, Period(1, Years), Period(10, Years) },
+
+
 
 		};
 
