@@ -42,15 +42,15 @@ int main() {
 	{
 
 		std::cout << "Testing calibration of a Libor forward model..."
-			<< std::endl;
+				  << std::endl;
 
 		/* basic settings */
 		SavedSettings backup;
 
-		const Size size_ = 20;								// 20 semestrers
-		const Real tolerance_ = 8e-3;						// tolerance
-		const Real convexity_ = 0.0;						// convexity adjustment for future prices
-		const Real meanReverting_ = 0.0;					// mean reversion for future prices
+		const Size size_          = 20    ;					// 20 semestrers
+		const Real tolerance_     = 8e-3  ;					// tolerance
+		const Real convexity_     = 0.008 ;					// convexity adjustment for future prices
+		const Real meanReverting_ = 0.030 ;					// mean reversion for future prices
 
 		const Calendar calendar								// pricing calendar
 			= JointCalendar(
@@ -87,8 +87,8 @@ int main() {
 			{ .0014250, 1, Period(2, Days) },
 			{ .0012150, 2, Period(1, Weeks) },
 			{ .0015200, 2, Period(1, Months) },
-			{ .0019300, 2, Period(2, Months) },
-			{ .0022785, 2, Period(3, Months) }
+			{ .0019300, 2, Period(2, Months) }/*,
+			{ .0022785, 2, Period(3, Months) }*/
 
 		};
 
@@ -96,12 +96,12 @@ int main() {
 			= std::vector<futureData>
 		{
 
-			{ 99.7725, "EDK4" },
+			//{ 99.7725, "EDK4" },
 			{ 99.7700, "EDM4" },
-			{ 99.7650, "EDN4" },
-			{ 99.7600, "EDQ4" },
+			//{ 99.7650, "EDN4" },
+			//{ 99.7600, "EDQ4" },
 			{ 99.7600, "EDU4" },
-			{ 99.7450, "EDV4" },
+			//{ 99.7450, "EDV4" },
 			{ 99.7250, "EDZ4" },
 			{ 99.6300, "EDH5" },
 			{ 99.4550, "EDM5" },
@@ -122,34 +122,35 @@ int main() {
 			// settlement and maturity dates
 			Date settlement = calendar.advance(
 				pricingDate, Period(It->settlementDays_, Days));
+
 			Date maturity = calendar.advance(
 				settlement, It->maturity_);
 
 			// creating the deposit
 			boost::shared_ptr<QuantLib::deposit> myDepositPtr(
 				new deposit(
-				pricingDate,
-				maturity,
-				calendar,
-				It->settlementDays_));
+					pricingDate,
+					maturity,
+					calendar,
+					It->settlementDays_));
 
 			Handle<Quote> quoteHandler(						// quote handle
 				boost::shared_ptr<Quote>(
-				new SimpleQuote(
-				myDepositPtr->cleanPrice(
-				It->quote_,
-				Actual360(),
-				Simple,
-				Once,
-				Unadjusted,
-				settlement))));
+					new SimpleQuote(
+						myDepositPtr->cleanPrice(
+						It->quote_,
+						Actual360(),
+						Simple,
+						Once,
+						Unadjusted,
+						settlement))));
 
 
 			rateHelpers.push_back(							// insert RateHelper
-				boost::shared_ptr<RateHelper>(new
-				depositBootstrapHelper(
-				quoteHandler,
-				myDepositPtr)));
+				boost::shared_ptr<RateHelper>(
+					new	depositBootstrapHelper(
+						quoteHandler,
+						myDepositPtr)));
 
 		}
 
@@ -159,15 +160,15 @@ int main() {
 
 			Handle<Quote> convexityHandle(					// convexity adjustment
 				boost::shared_ptr<Quote>(
-				new SimpleQuote(convexity_)));
+					new SimpleQuote(convexity_)));
 
 			Handle<Quote> meanRevertingHandle(				// mean reverting
 				boost::shared_ptr<Quote>(
-				new SimpleQuote(meanReverting_)));
+					new SimpleQuote(meanReverting_)));
 
 			Handle<Quote> futurePriceHandle(				// price
 				boost::shared_ptr<Quote>(
-				new SimpleQuote(It->price_)));
+					new SimpleQuote(It->price_)));
 
 			Date futureDate = IMM::date(					// IMM date
 				It->futureCode_.substr(2, 2),
@@ -175,21 +176,21 @@ int main() {
 
 			Handle<Quote> convexityAdjustedQuoteHendle(		// convexity adjustement
 				boost::shared_ptr<Quote>(
-				new futuresConvexityAdjustmentQuote2(
-				libor,
-				futureDate,
-				futurePriceHandle,
-				convexityHandle,
-				meanRevertingHandle,
-				pricingDate)));
+					new futuresConvexityAdjustmentQuote2(
+						libor,
+						futureDate,
+						futurePriceHandle,
+						convexityHandle,
+						meanRevertingHandle,
+						pricingDate)));
 
 			rateHelpers.push_back(							// helper
 				boost::shared_ptr<FuturesRateHelper>(
-				new FuturesRateHelper(
-				convexityAdjustedQuoteHendle,
-				futureDate,
-				libor,
-				convexityAdjustedQuoteHendle)));
+					new FuturesRateHelper(
+						futurePriceHandle,
+						futureDate,
+						libor,
+						convexityAdjustedQuoteHendle)));
 
 		}
 
@@ -224,11 +225,19 @@ int main() {
 			<< std::endl;
 
 		std::cout << "yield curve value on 6M: "
-			<< curve->zeroRate(6.0 / 12, Continuous)
+			<< curve->zeroRate(.5, Continuous)
 			<< std::endl;
 
 		std::cout << "yield curve value on 1Y: "
-			<< curve->zeroRate(12.0 / 12, Continuous)
+			<< curve->zeroRate(1.0, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 2Y: "
+			<< curve->zeroRate(2.0, Continuous)
+			<< std::endl;
+
+		std::cout << "yield curve value on 3Y: "
+			<< curve->zeroRate(3.0, Continuous)
 			<< std::endl;
 
 		std::vector<swaptionData> swaptions					// swaption data
