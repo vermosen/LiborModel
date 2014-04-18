@@ -235,7 +235,7 @@ void LiborMarketModelTest::testCalibration() {
 
 	// set-up calibration helper
 	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
-
+	
 	Size i;
 	for (i = 2; i < size; ++i) {
 		const Period maturity = i*index->tenor();

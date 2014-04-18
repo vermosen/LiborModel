@@ -9,22 +9,28 @@
  */
 
 #include <ql/quantlib.hpp>
-#include <ql/utilities/csvBuilder.hpp>
 
 using namespace QuantLib;
 
 struct depositData {
 
-	Real   quote_;
+	Real    quote_;
 	Natural settlementDays_;
-	Period maturity_;
+	Period  maturity_;
 
 };
 
 struct futureData {
 
-	Real   price_;
+	Real        price_;
 	std::string futureCode_;
+
+};
+
+struct swapData {
+
+	Rate   fairRate_;
+	Period maturity_;
 
 };
 
@@ -112,6 +118,22 @@ int main() {
 			{ 98.0500, "EDU6" },
 			{ 97.7850, "EDZ6" },
 			{ 97.5600, "EDU7" }
+
+		};
+
+		std::vector<swapData> swapRates					// future data
+			= std::vector<swapData>
+		{
+
+			{ .0139980, Period(4 , Years) },
+			{ .0176100, Period(5 , Years) },
+			{ .0205300, Period(6 , Years) },
+			{ .0228500, Period(7 , Years) },
+			{ .0247290, Period(8 , Years) },
+			{ .0262750, Period(9 , Years) },
+			{ .0275070, Period(10, Years) },
+			{ .0286800, Period(11, Years) },
+			{ .0286800, Period(12, Years) }
 
 		};
 
