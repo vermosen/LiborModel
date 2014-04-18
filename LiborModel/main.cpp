@@ -45,8 +45,8 @@ struct swaptionData {
 boost::shared_ptr<IborIndex> indexCreation()				// creates the libor index
 {
 
-	const Real convexity_ = 0.008;					// convexity adjustment for future prices
-	const Real meanReverting_ = 0.030;					// mean reversion for future prices
+	const Real convexity_ = 0.009;						// convexity adjustment for future prices
+	const Real meanReverting_ = 0.09;					// mean reversion for future prices
 
 	const Calendar calendar								// pricing calendar
 		= JointCalendar(
@@ -83,8 +83,7 @@ boost::shared_ptr<IborIndex> indexCreation()				// creates the libor index
 		{ .0014250, 1, Period(2, Days) },
 		{ .0012150, 2, Period(1, Weeks) },
 		{ .0015200, 2, Period(1, Months) },
-		{ .0019300, 2, Period(2, Months) }/*,
-										  { .0022785, 2, Period(3, Months) }*/
+		{ .0019300, 2, Period(2, Months) }
 
 	};
 
@@ -92,12 +91,8 @@ boost::shared_ptr<IborIndex> indexCreation()				// creates the libor index
 		= std::vector<futureData>
 	{
 
-		//{ 99.7725, "EDK4" },
 		{ 99.7700, "EDM4" },
-			//{ 99.7650, "EDN4" },
-			//{ 99.7600, "EDQ4" },
 		{ 99.7600, "EDU4" },
-		//{ 99.7450, "EDV4" },
 		{ 99.7250, "EDZ4" },
 		{ 99.6300, "EDH5" },
 		{ 99.4550, "EDM5" },
@@ -106,8 +101,7 @@ boost::shared_ptr<IborIndex> indexCreation()				// creates the libor index
 		{ 98.6450, "EDH6" },
 		{ 98.3400, "EDM6" },
 		{ 98.0500, "EDU6" },
-		{ 97.7850, "EDZ6" },
-		{ 97.5600, "EDU7" }
+		{ 97.7850, "EDZ6" }
 
 	};
 
@@ -352,6 +346,7 @@ int main() {
 			new LiborForwardModelProcess(size_, libor));
 
 		std::vector<Time> fixingT = process->fixingTimes();
+
 		// set-up the model
 		boost::shared_ptr<LmVolatilityModel> volaModel(
 			new LmExtLinearExponentialVolModel(process->fixingTimes(),
@@ -401,7 +396,7 @@ int main() {
 #else
 
 		LevenbergMarquardt om(1e-6, 1e-6, 1e-6);
-		model->calibrate(calibrationHelper, om, EndCriteria(5000, 100, 1e-6, 1e-6, 1e-6));
+		model->calibrate(calibrationHelper, om, EndCriteria(2000, 100, 1e-6, 1e-6, 1e-6));
 
 #endif
 
@@ -411,11 +406,6 @@ int main() {
 			Real diff = calibrationHelper[i]->calibrationError();
 			calculated += diff * diff;
 		}
-
-		if (std::sqrt(calculated) > tolerance_)
-			std::cout << "Failed to calibrate libor forward model"
-			<< "\n    calculated diff: " << std::sqrt(calculated)
-			<< "\n    expected : smaller than  " << tolerance_ << std::endl;
 
 		// create diagnostic file
 		{
@@ -431,36 +421,22 @@ int main() {
 
 			for (int i = 0; i < size_; i++) {
 
-				times[i] = 0.25*(i + 1);
+				times[i] = fixingT[i];							// the fixing times from model
 				rates[i] = libor->forwardingTermStructure()->zeroRate(
-					times[i], Continous);
+					times[i], Continuous);
 
 			}
 
 			file.add("times", 1, 1); file.add("rates", 1, 2);	// adds the yield curve data
 			file.add( times , 2, 1); file.add( rates , 2, 2);
+			
 			file.add(std::string("calibration result:"), 1, 4);	// calibration result
+			file.add(model->endCriteria(), 2, 4);
 
-			switch (model->endCriteria()) {						// different case, could use a factory...
+			file.add(std::string("calculated diff:"), 4, 4);	// calibration result
+			file.add(std::sqrt(calculated), 5, 4);
 
-				case EndCriteria::StationaryPoint:
-					file.add(std::string("stationnary point"), 2, 4);
-					break;
-
-				case EndCriteria::MaxIterations:
-					file.add(std::string("Max Iterations reached"), 2, 4);
-					break;
-
-				case EndCriteria::StationaryFunctionValue:
-					file.add("Stationary Function Value reached", 2, 4);
-					break;
-
-				default:
-					file.add(std::string("unknown result"), 2, 4);
-			}
-
-			// swaption volatility matrix
-			file.add("correlation matrix at time zero", 1, 6);
+			file.add("correlation matrix at time zero", 1, 6);	// correlation
 			file.add(corrModel->correlation(0), 2, 6);
 
 		}
