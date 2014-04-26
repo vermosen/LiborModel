@@ -1,0 +1,3 @@
+optimization problem size = 48
++ 46 for the vol model = 42 (number of rates) + 4 coefs abcd
++ 2 for the correlation model

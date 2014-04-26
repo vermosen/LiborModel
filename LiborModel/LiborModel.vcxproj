@@ -77,6 +77,7 @@
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -86,11 +87,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="curveCreation\curveCreation.cpp" />
     <ClCompile Include="garbage.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="GridSearch.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="test1Y10\test1Y10.cpp" />
+    <ClCompile Include="test1Y5new\test1Y5new.cpp" />
+    <ClCompile Include="test1Y5\test1Y5.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Text.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="curveCreation\curveCreation.hpp" />
+    <ClInclude Include="GridSearch.hpp" />
+    <ClInclude Include="main.hpp" />
+    <ClInclude Include="test1Y10\test1Y10.hpp" />
+    <ClInclude Include="test1Y5new\test1Y5new.hpp" />
+    <ClInclude Include="test1Y5\test1Y5.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
