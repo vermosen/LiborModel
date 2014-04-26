@@ -25,25 +25,80 @@ FOR A PARTICULAR PURPOSE.  See the license for more details.
 
 namespace QuantLib {
 
-	MultiGrid::MultiGrid(Size size) : size_(size) {
+	D6MultiGrid::D6MultiGrid() {
 	
+		// default to 0.0
 		max_ = Array(size_, 0.0);
 		min_ = Array(size_, 0.0);
-		stepSize_ = Array(size_, 0.0);
+		step_ = Array(size_, 0.0);
 
 	};
 
-	void MultiGrid::addDimensionStep(
+	void D6MultiGrid::addDimensionStep(
 		Natural position,
 		Real max,
 		Real min,
-		Real stepSize) {
+		Real step) {
+
+		QL_ENSURE(position < size_, "Bondary index out of range");
 
 		max_[position] = max;
 		min_[position] = min;
-		stepSize_[position] = stepSize;
+		step_[position] = step;
 
 	}
+
+	std::vector<Array> D6MultiGrid::results() {
+	
+		std::vector<Array> data;
+
+		Array d(size_, 0.0);
+
+		// create the sizes
+		for (Size i = 0; i < 6; i++)		
+			d[i] = (max_[i] - min_[i]) / step_[i];
+		
+		// returns the grid
+		for (Size i_0 = 0; i_0 < d[0]; i_0++){
+		
+			for (Size i_1 = 0; i_1 < d[1]; i_1++){
+
+				for (Size i_2 = 0; i_2 < d[2]; i_2++){
+
+					for (Size i_3 = 0; i_3 < d[3]; i_3++){
+
+						for (Size i_4 = 0; i_4 < d[4]; i_4++){
+
+							for (Size i_5 = 0; i_5 < d[5]; i_5++){
+
+								Array temp(0.0, 6);
+
+								temp[0] = min_[0] + i_0 * step_[0];
+								temp[1] = min_[1] + i_0 * step_[1];
+								temp[2] = min_[2] + i_0 * step_[2];
+								temp[3] = min_[3] + i_0 * step_[3];
+								temp[4] = min_[4] + i_0 * step_[4];
+								temp[5] = min_[5] + i_0 * step_[5];
+
+								data.push_back(temp);
+
+							}
+
+						}
+
+					}
+
+
+				}
+
+
+			}
+		
+		}
+
+		return data
+
+	};
 
 	GridSearch::GridSearch(
 		Size size,

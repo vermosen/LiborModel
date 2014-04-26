@@ -25,31 +25,36 @@ FOR A PARTICULAR PURPOSE.  See the license for more details.
 #define quantlib_optimization_grid_search_hpp
 
 #include <ql/math/optimization/problem.hpp>
+#include <boost/multi_array.hpp>
 
 namespace QuantLib {
 
-	//! Grid Search optimization method
+	//! 6D Grid Search optimization method
 	/*! Levenberg-Marquardt based grid-search
 	*/
 
-	class MultiGrid {
+	class D6MultiGrid {
 
 	public:
 
-		MultiGrid(Size size);
+		D6MultiGrid();
 
 		void addDimensionStep(
 			Natural position,
 			Real max,
 			Real min,
-			Real stepSize);
+			Real step);
+
+		std::vector<Array> results();
 
 	private:
 
-		Size size_;
+		const Size size_ = 6;
 		Array max_;
 		Array min_;
-		Array stepSize_;
+		Array step_;
+
+		std::vector<Array> D6MultiGrid::results();
 
 	};
 
