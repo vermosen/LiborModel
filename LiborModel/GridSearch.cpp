@@ -17,108 +17,39 @@ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE.  See the license for more details.
 */
 
-#include <ql/math/optimization/constraint.hpp>
-#include <ql/math/optimization/lmdif.hpp>
-#include <ql/math/optimization/levenbergmarquardt.hpp>
-#include "gridsearch.hpp"
-#include <boost/bind.hpp>
+#include "GridSearch.hpp"
 
 namespace QuantLib {
 
-	D6MultiGrid::D6MultiGrid() {
-	
-		// default to 0.0
-		max_ = Array(size_, 0.0);
-		min_ = Array(size_, 0.0);
-		step_ = Array(size_, 0.0);
-
-	};
-
-	void D6MultiGrid::addDimensionStep(
-		Natural position,
-		Real max,
-		Real min,
-		Real step) {
-
-		QL_ENSURE(position < size_, "Bondary index out of range");
-
-		max_[position] = max;
-		min_[position] = min;
-		step_[position] = step;
-
-	}
-
-	std::vector<Array> D6MultiGrid::results() {
-	
-		std::vector<Array> data;
-
-		Array d(size_, 0.0);
-
-		// create the sizes
-		for (Size i = 0; i < 6; i++)		
-			d[i] = (max_[i] - min_[i]) / step_[i];
-		
-		// returns the grid
-		for (Size i_0 = 0; i_0 < d[0]; i_0++){
-		
-			for (Size i_1 = 0; i_1 < d[1]; i_1++){
-
-				for (Size i_2 = 0; i_2 < d[2]; i_2++){
-
-					for (Size i_3 = 0; i_3 < d[3]; i_3++){
-
-						for (Size i_4 = 0; i_4 < d[4]; i_4++){
-
-							for (Size i_5 = 0; i_5 < d[5]; i_5++){
-
-								Array temp(0.0, 6);
-
-								temp[0] = min_[0] + i_0 * step_[0];
-								temp[1] = min_[1] + i_0 * step_[1];
-								temp[2] = min_[2] + i_0 * step_[2];
-								temp[3] = min_[3] + i_0 * step_[3];
-								temp[4] = min_[4] + i_0 * step_[4];
-								temp[5] = min_[5] + i_0 * step_[5];
-
-								data.push_back(temp);
-
-							}
-
-						}
-
-					}
-
-
-				}
-
-
-			}
-		
-		}
-
-		return data
-
-	};
-
-	GridSearch::GridSearch(
-		Size size,
+	D6GridSearch::D6GridSearch(
 		Real epsfcn,
 		Real xtol,
-		Real gtol) : size_(size), epsfcn_(epsfcn), xtol_(xtol), gtol_(gtol) {}
+		Real gtol) : epsfcn_(epsfcn), xtol_(xtol), gtol_(gtol) {}
 
-	EndCriteria::Type GridSearch::minimize(Problem& P,
+	void D6GridSearch::setGrid(
+		const Array & max,
+		const Array & min,
+		const Array & step) {
+	
+		QL_REQUIRE(max.size() == size_, "grid max values has wrong dimensions");
+		QL_REQUIRE(max.size() == size_, "grid min values has wrong dimensions");
+		QL_REQUIRE(max.size() == size_, "grid step values has wrong dimensions");
+
+		max_ = max;
+		min_ = min;
+		step_ = step;	
+	
+	};
+
+
+	EndCriteria::Type D6GridSearch::minimize(Problem& P,
 		const EndCriteria& endCriteria) {
 
-		// create the full vector
-		Size totalSize = 1;
-
 		// create the grid
+		D6MultiGrid grid;
+
 		for (Size i = 0; i < size_; i++)
-		{
-
-			totalSize = totalSize * (max_[i] - min_[i]) / stepSize_[i];
-
-		}
+			grid.addDimensionStep(i, min_[i], max_[i], step_[i]);
 
 		opt_.push_back(boost::shared_ptr<OptimizationMethod>(
 			new LevenbergMarquardt(epsfcn_, xtol_, gtol_)));
@@ -128,7 +59,7 @@ namespace QuantLib {
 
 		QuantLib::Problem local = P;
 		local.value(guess);
-		opt_[0]->minimize(local, endCriteria);
+		return opt_[0]->minimize(local, endCriteria);
 
 	}
 
