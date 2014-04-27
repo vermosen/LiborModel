@@ -8,15 +8,15 @@
 *
 */
 
-#include "test1Y5new/test1Y5new.hpp"
+#include "test1Y5grid/test1Y5grid.hpp"
 
-void test1Y5new() {
-	/*
+void test1Y5Grid() {
+
 	std::cout << "Testing calibration of a Libor forward model with 1Y5 settings..."
 		<< std::endl;
 
 
-	// basic settings
+	/* basic settings */
 	SavedSettings backup;
 
 	const Size size_ = 18;								// 24 trimesters
@@ -71,51 +71,16 @@ void test1Y5new() {
 
 	std::vector<Time> fixingT = process->fixingTimes();
 
-	// correlation model
-	boost::shared_ptr<PiecewiseConstantCorrelation> corrModel(
-		new ExponentialForwardCorrelation(process->fixingTimes()));
+	// set-up the volatility model
+	boost::shared_ptr<LmVolatilityModel> volaModel(
+		new LmLinearExponentialVolatilityModel(process->fixingTimes(),
+		0.9, 0.5, 0.5, 0.5));
 
-	// Evolution Model
-	EvolutionDescription ed(process->fixingTimes());
+	boost::shared_ptr<LmCorrelationModel> corrModel(
+		new LmExponentialCorrelationModel(size_, 0.1));
 
-	// ctor
-	//explicit EvolutionDescription(
-	//	const std::vector<Time>& rateTimes,
-	//	const std::vector<Time>& evolutionTimes = std::vector<Time>(),
-	//	const std::vector<std::pair<Size, Size> >& relevanceRates =
-	//	std::vector<range>());
-
-	// sets the initial rates
-	std::vector<Rate> rates, std::vector<Spread> displacements;
-
-	for (std::vector<Time>::const_iterator It = process->fixingTimes().cbegin();
-		It != process->fixingTimes().cend(); It++)
-	{
-
-		rates.push_back(termStructure->zeroRate(*It, Continuous).rate());
-		displacements.push_back(.0001); // 1 bp
-	}
-
-	// creates the model
-	//boost::shared_ptr<MarketModel> model(
-	//	new AbcdVol(.5, .5, .5, .5, 
-	//				process->fixingTimes(), // a checker 
-	//				corrModel,
-	//				ed, process->fixingTimes().size(), 
-	//				rates));
-
-	// abcdVol ctor
-	//AbcdVol(
-	//	Real a,
-	//	Real b,
-	//	Real c,
-	//	Real d,
-	//	const std::vector<Real>& ks,
-	//	const boost::shared_ptr<PiecewiseConstantCorrelation>& corr,
-	//	const EvolutionDescription& evolution,
-	//	const Size numberOfFactors,
-	//	const std::vector<Rate>& initialRates,
-	//	const std::vector<Spread>& displacements);
+	boost::shared_ptr<LiborForwardModel> model(
+		new LiborForwardModel(process, volaModel, corrModel));
 
 	Size swapVolIndex = 0;
 	DayCounter dayCounter = libor->forwardingTermStructure()->dayCounter();
@@ -154,10 +119,13 @@ void test1Y5new() {
 
 #else
 
+	//boost::shared_ptr<OptimizationMethod> om(
+	//	new LevenbergMarquardt(1e-6, 1e-6, 1e-6));
+
 	boost::shared_ptr<OptimizationMethod> om(
-		new LevenbergMarquardt(1e-6, 1e-6, 1e-6));
-	//boost::shared_ptr<OptimizationMethod> om(new SteepestDescent);
-	model->calibrate(calibrationHelper, *om, EndCriteria(5000, 20, 1e-8, 1e-8, 1e-8));
+		new LevenbergMarquardt(1e-12, 1e-12, 1e-12));
+
+	model->calibrate(calibrationHelper, *om, EndCriteria(5000, 100, 1e-12, 1e-12, 1e-12));
 
 #endif
 	// measure the calibration error
@@ -198,10 +166,9 @@ void test1Y5new() {
 
 		file.add("correlation matrix at time zero", 1, 6);	// correlation
 		file.add(corrModel->correlation(0), 2, 6);
-		
-		
 
+		file.add("parameters", 30, 1);						// calibrated parameters
+		file.add(model->params(), 31, 1);
 	}
-	*/
 
 }

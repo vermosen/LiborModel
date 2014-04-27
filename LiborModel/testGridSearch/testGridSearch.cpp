@@ -31,7 +31,6 @@ void testGridSearch() {
 
 	QuantLib::EndCriteria::Type end = search.minimize(P, ed);
 
-
 	std::cout << "optimization results: " 
 			  << end
 			  << std::endl;
