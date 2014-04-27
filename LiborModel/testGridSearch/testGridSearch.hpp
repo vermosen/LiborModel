@@ -8,13 +8,13 @@
 
 #include "GridSearch.hpp"
 
-class productFunction : public QuantLib::CostFunction {
+class squareProductFunction : public QuantLib::CostFunction {
 
 	QuantLib::Real value(const QuantLib::Array& x) const {
 	
 		QuantLib::Real result = 1;
 		for (QuantLib::Size i = 0; i < x.size(); i++)
-			result *= x[i];
+			result *= x[i] * x[i];
 	
 		return result;
 

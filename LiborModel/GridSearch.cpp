@@ -27,13 +27,17 @@ namespace QuantLib {
 		Real gtol) : epsfcn_(epsfcn), xtol_(xtol), gtol_(gtol) {}
 
 	void D6GridSearch::setGrid(
-		const Array & max,
 		const Array & min,
+		const Array & max,
 		const Array & step) {
 	
 		QL_REQUIRE(max.size() == size_, "grid max values has wrong dimensions");
 		QL_REQUIRE(max.size() == size_, "grid min values has wrong dimensions");
 		QL_REQUIRE(max.size() == size_, "grid step values has wrong dimensions");
+
+		for (Size i = 0; i < size_; i++)
+			QL_REQUIRE(max[i] >= min[i], 
+			"one of the maximum is lower than its associated minimum");
 
 		max_ = max;
 		min_ = min;
@@ -51,23 +55,27 @@ namespace QuantLib {
 		for (Size i = 0; i < size_; i++)
 			grid.addDimensionStep(i, min_[i], max_[i], step_[i]);
 
-		opt_.push_back(boost::shared_ptr<OptimizationMethod>(
-			new LevenbergMarquardt(epsfcn_, xtol_, gtol_)));
+		std::vector<Array> guesses = grid.results();
 
-		// build initial values
-		Array guess(1, 0.0);
+		std::vector<double> res;
 
-		QuantLib::Problem local = P;
-		local.value(guess);
-		return opt_[0]->minimize(local, endCriteria);
+		for (std::vector<Array>::const_iterator It = guesses.cbegin();
+			It != guesses.cend(); It++) {
+		
+			res.push_back(-P.value(*It));
+		
+		}
+		
+		// find the highest result
+		Size t = std::distance(
+			res.cbegin(), std::max_element(res.cbegin(), res.cend()));
+
+		P.setCurrentValue(guesses[t]);
+
+		// TODO: get the max value (quick sort) and associated array
+		return EndCriteria::Type::StationaryFunctionValue;
 
 	}
-
-	void addParameterStep(
-		Natural position,
-		Real max,
-		Real min,
-		Real stepSize) {};
 
 }
 

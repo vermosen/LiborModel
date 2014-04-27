@@ -16,23 +16,18 @@ void testGridSearch() {
 
 	// set the problem
 	boost::shared_ptr<QuantLib::CostFunction> C(
-		new productFunction);
+		new squareProductFunction);
 
 	QuantLib::Problem P(*C, QuantLib::NoConstraint());
 
 	QuantLib::D6GridSearch search;
 
-	search.setGrid(QuantLib::Array(6, 0.0), 
+	search.setGrid(QuantLib::Array(6, -1.0), 
 				   QuantLib::Array(6, 1.0), 
-				   QuantLib::Array(6, 2.0));
+				   QuantLib::Array(6, 0.2));
 
+	// end criteria -> 
 	QuantLib::EndCriteria ed(1, 1, 1e-8, 1e-8, 1e-8);
-	
-	//EndCriteria(Size maxIterations,
-	//	Size maxStationaryStateIterations,
-	//	Real rootEpsilon,
-	//	Real functionEpsilon,
-	//	Real gradientNormEpsilon);
 
 	QuantLib::EndCriteria::Type end = search.minimize(P, ed);
 
@@ -41,4 +36,7 @@ void testGridSearch() {
 			  << end
 			  << std::endl;
 
+	std::cout << "solution found: "
+			  << P.currentValue()
+			  << std::endl;
 }
