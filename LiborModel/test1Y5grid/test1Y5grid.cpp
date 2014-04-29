@@ -117,8 +117,8 @@ void test1Y5Grid() {
 	QuantLib::Array step(6, .3);
 
 	// set the grid
-	boost::shared_ptr<D6GridSearch> om(
-		new D6GridSearch());
+	boost::shared_ptr<D5GridSearch> om(
+		new D5GridSearch());
 
 	om->setGrid(min, max, step);
 

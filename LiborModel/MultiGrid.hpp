@@ -61,7 +61,7 @@ namespace QuantLib {
 
 	public:
 
-		D6MultiGrid();
+		D5MultiGrid();
 
 		void addDimensionStep(
 			Natural position,
