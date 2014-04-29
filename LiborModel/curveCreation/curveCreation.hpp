@@ -1,7 +1,14 @@
 #ifndef curve_creation
 #define curve_creation
 
-#include <ql/quantlib.hpp>
+#include <ql/termstructures/yield/depositBootstrapHelper.hpp>
+#include <ql/termstructures/yield/interestRateSwapBootstrapHelper.hpp>
+#include <ql/termstructures/yield/ratehelpers.hpp>
+#include <ql/time/daycounters/all.hpp>
+#include <ql/quotes/futuresConvexityAdjustmentQuote2.hpp>
+#include <ql/time/calendars/all.hpp>
+#include <ql/indexes/ibor/usdlibor.hpp>
+#include <ql/termstructures/yield/swapCurve.hpp>
 
 using namespace QuantLib;
 

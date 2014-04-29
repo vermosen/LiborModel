@@ -88,9 +88,7 @@ void test1Y5Grid() {
 	// set-up calibration helper
 	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
 
-	Size i;
-
-	for (i = 0; i < swaptions.size(); i++) {
+	for (Size i = 0; i < swaptions.size(); i++) {
 
 		Handle<Quote> swaptionVol(
 			boost::shared_ptr<Quote>(
@@ -112,10 +110,10 @@ void test1Y5Grid() {
 
 	}
 
-	QuantLib::Array min(5, .1);
-	min[0] = .5; min[1] = .4; min[2] = .5; min[3] = .1; min[4] = .85;
+	//set the grid
+	QuantLib::Array min(5, 0.0);
 	QuantLib::Array max(5, 1.0);
-	QuantLib::Array step(5, .15);
+	QuantLib::Array step(5, .1);
 
 	// set the grid
 	boost::shared_ptr<GridSearch<D5MultiGrid> > om(
@@ -135,7 +133,7 @@ void test1Y5Grid() {
 
 	// measure the calibration error
 	Real calculated = 0.0;
-	for (i = 0; i<calibrationHelper.size(); ++i) {
+	for (Size i = 0; i<calibrationHelper.size(); ++i) {
 		Real diff = calibrationHelper[i]->calibrationError();
 		calculated += diff * diff;
 	}
@@ -143,7 +141,7 @@ void test1Y5Grid() {
 	// create diagnostic file
 	{
 
-		std::string fileStr("C:/Temp/liborModel_1Y5_");			// build file path
+		std::string fileStr("C:/Temp/liborModel_1Y5Grid_");			// build file path
 		fileStr.append(boost::posix_time::to_iso_string(
 			boost::posix_time::second_clock::local_time()));
 		fileStr.append(".csv");
@@ -152,7 +150,7 @@ void test1Y5Grid() {
 
 		Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
 
-		for (int i = 0; i < size_; i++) {
+		for (Size i = 0; i < size_; i++) {
 
 			times[i] = fixingT[i];							// the fixing times from model
 			rates[i] = libor->forwardingTermStructure()->zeroRate(

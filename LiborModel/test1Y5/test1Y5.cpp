@@ -102,7 +102,7 @@ void test1Y5() {
 			libor->tenor(), dayCounter,
 			libor->dayCounter(),
 			termStructure,
-			CalibrationHelper::ImpliedVolError));
+			CalibrationHelper::RelativePriceError));
 
 		swaptionHelper->setPricingEngine(
 			boost::shared_ptr<PricingEngine>(
