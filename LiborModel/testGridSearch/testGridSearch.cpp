@@ -20,7 +20,7 @@ void testGridSearch() {
 
 	QuantLib::Problem P(*C, QuantLib::NoConstraint());
 
-	QuantLib::D6GridSearch search;
+	QuantLib::GridSearch<QuantLib::D6MultiGrid> search;
 
 	// grid with first dimension flat
 	QuantLib::Array min(6, -1.0); min[0] = .5;

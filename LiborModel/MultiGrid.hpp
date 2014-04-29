@@ -46,9 +46,11 @@ namespace QuantLib {
 			Real max,
 			Real step);
 
-		std::vector<Array> results();
+		std::vector<Array> results() const;
 
-	private:
+		inline Size size() const { return size_; };
+
+	protected:
 
 		const Size size_ = 6;
 		Array max_;
@@ -69,9 +71,11 @@ namespace QuantLib {
 			Real max,
 			Real step);
 
-		std::vector<Array> results();
+		std::vector<Array> results() const;
 
-	private:
+		inline Size size() const{ return size_; };
+
+	protected:
 
 		const Size size_ = 5;
 		Array max_;

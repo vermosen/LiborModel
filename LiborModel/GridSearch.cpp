@@ -50,7 +50,7 @@ namespace QuantLib {
 		const EndCriteria& endCriteria) {
 
 		// create the grid
-		D6MultiGrid grid;
+		T grid;
 
 		for (Size i = 0; i < size_; i++)
 			grid.addDimensionStep(i, min_[i], max_[i], step_[i]);

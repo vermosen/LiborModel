@@ -112,19 +112,18 @@ void test1Y5Grid() {
 
 	}
 
-	QuantLib::Array min(6, QL_EPSILON);
-	QuantLib::Array max(6, .9);
-	QuantLib::Array step(6, .3);
+	QuantLib::Array min(5, QL_EPSILON);
+	QuantLib::Array max(5, .9);
+	QuantLib::Array step(5, .3);
 
 	// set the grid
-	boost::shared_ptr<D5GridSearch> om(
-		new D5GridSearch());
+	boost::shared_ptr<GridSearch<D5MultiGrid> > om(
+		new GridSearch<D5MultiGrid>());
 
 	om->setGrid(min, max, step);
 
 #ifdef _DEBUG
 
-	
 	model->calibrate(calibrationHelper, *om, EndCriteria(1, 1, 1e-5, 1e-5, 1e-5));
 
 #else
