@@ -22,11 +22,17 @@ void testGridSearch() {
 
 	QuantLib::D6GridSearch search;
 
-	search.setGrid(QuantLib::Array(6, -1.0), 
-				   QuantLib::Array(6, 1.0), 
-				   QuantLib::Array(6, 0.2));
+	// grid with first dimension flat
+	QuantLib::Array min(6, -1.0); min[0] = .5;
+	QuantLib::Array max(6, 1.0); max[0] = .5;
+	QuantLib::Array step(6, .2);
 
-	// end criteria -> 
+	search.setGrid(
+		min, 
+		max, 
+		step);
+
+	// end criteria
 	QuantLib::EndCriteria ed(1, 1, 1e-8, 1e-8, 1e-8);
 
 	QuantLib::EndCriteria::Type end = search.minimize(P, ed);

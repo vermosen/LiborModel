@@ -57,6 +57,29 @@ namespace QuantLib {
 
 	};
 
+	class D5MultiGrid {
+
+	public:
+
+		D6MultiGrid();
+
+		void addDimensionStep(
+			Natural position,
+			Real min,
+			Real max,
+			Real step);
+
+		std::vector<Array> results();
+
+	private:
+
+		const Size size_ = 5;
+		Array max_;
+		Array min_;
+		Array step_;
+
+	};
+
 }
 
 

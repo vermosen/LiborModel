@@ -112,22 +112,30 @@ void test1Y5Grid() {
 
 	}
 
+	QuantLib::Array min(6, QL_EPSILON);
+	QuantLib::Array max(6, .9);
+	QuantLib::Array step(6, .3);
+
+	// set the grid
+	boost::shared_ptr<D6GridSearch> om(
+		new D6GridSearch());
+
+	om->setGrid(min, max, step);
+
 #ifdef _DEBUG
 
-	LevenbergMarquardt om(1e-5, 1e-5, 1e-5);
-	model->calibrate(calibrationHelper, om, EndCriteria(100, 20, 1e-5, 1e-5, 1e-6));
+	
+	model->calibrate(calibrationHelper, *om, EndCriteria(1, 1, 1e-5, 1e-5, 1e-5));
 
 #else
 
-	//boost::shared_ptr<OptimizationMethod> om(
-	//	new LevenbergMarquardt(1e-6, 1e-6, 1e-6));
-
 	boost::shared_ptr<OptimizationMethod> om(
-		new LevenbergMarquardt(1e-12, 1e-12, 1e-12));
+		new D6GridSearch());
 
-	model->calibrate(calibrationHelper, *om, EndCriteria(5000, 100, 1e-12, 1e-12, 1e-12));
+	model->calibrate(calibrationHelper, *om, EndCriteria(1, 1, 1e-12, 1e-12, 1e-12));
 
 #endif
+
 	// measure the calibration error
 	Real calculated = 0.0;
 	for (i = 0; i<calibrationHelper.size(); ++i) {

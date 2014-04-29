@@ -57,7 +57,7 @@ namespace QuantLib {
 
 		std::vector<Array> guesses = grid.results();
 
-		std::vector<double> res;
+		std::vector<double> res; res.reserve(guesses.size());
 
 		for (std::vector<Array>::const_iterator It = guesses.cbegin();
 			It != guesses.cend(); It++) {
