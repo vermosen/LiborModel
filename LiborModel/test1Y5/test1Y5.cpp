@@ -15,10 +15,19 @@ void test1Y5() {
 	std::cout << "Testing calibration of a Libor forward model with 1Y5 settings..."
 		<< std::endl;
 
+	double a = 0.0;										//custom a
+	std::cout << "please enter correlation parameter 1 (0 default):" 
+			  << std::endl;
+	std::cin >> a;
+	(a == 0.0 ? a = 0.65 : true);
+	
+	double b = 0.0;										// custom b
+	std::cout << "please enter correlation parameter 2 (0 default):" 
+			  << std::endl;
+	std::cin >> b;
+	(b == 0.0 ? b = 0.65 : true);
 
-	/* basic settings */
-	SavedSettings backup;
-
+	SavedSettings backup;								// basic settings
 	const Size size_ = 18;								// 24 trimesters
 	const Real tolerance_ = 8e-3;						// tolerance
 
@@ -28,8 +37,8 @@ void test1Y5() {
 		= std::vector<swaptionData> {
 
 			//{ 50.200, Period(1, Months), Period(1, Years) },
-			//{ 54.475, Period(3, Months), Period(1, Years) },
-			//{ 63.350, Period(6, Months), Period(1, Years) },
+			{ 54.475, Period(3, Months), Period(1, Years) },
+			{ 63.350, Period(6, Months), Period(1, Years) },
 			//{ 68.650, Period(1, Years), Period(1, Years) },
 			//{ 49.850, Period(2, Years), Period(1, Years) },
 			//{ 38.500, Period(3, Years), Period(1, Years) },
@@ -71,16 +80,16 @@ void test1Y5() {
 
 	std::vector<Time> fixingT = process->fixingTimes();
 
-	// set-up the volatility model
+	// set-up the volatility model -> close to expected values to speed-yup calibration
 	boost::shared_ptr<LmVolatilityModel> volaModel(
 		new LmLinearExponentialVolatilityModel(process->fixingTimes(),
-		0.5, 0.5, 0.5, 0.5));
+		0.9, 1.2, 0.35, 0.1));
 
-	//boost::shared_ptr<LmCorrelationModel> underlyingCorrModel(
-	//	new LmLinearExponentialCorrelationModel(size_, 0.7, 0.2, 3));
-	
-	boost::shared_ptr<LmCorrelationModel> underlyingCorrModel( // todo: calibrate on real data
-		new LmExponentialCorrelationModel(size_, 0.01));
+	boost::shared_ptr<LmCorrelationModel> underlyingCorrModel(
+		new LmLinearExponentialCorrelationModel(size_, a, b, 3));
+
+	//boost::shared_ptr<LmCorrelationModel> underlyingCorrModel( // todo: calibrate on real data
+	//	new LmExponentialCorrelationModel(size_, 0.01));
 
 	boost::shared_ptr<LmCorrelationModel> corrModel(
 		new LmConstWrapperCorrelationModel(underlyingCorrModel));
@@ -128,7 +137,11 @@ void test1Y5() {
 	boost::shared_ptr<OptimizationMethod> om(
 		new LevenbergMarquardt(1e-12, 1e-12, 1e-12));
 
-	model->calibrate(calibrationHelper, *om, EndCriteria(5000, 50, 1e-12, 1e-12, 1e-12));
+	model->calibrate(
+		calibrationHelper, *om, 
+		EndCriteria(
+			5000, 50, 1e-12, 
+			1e-12, 1e-12));
 
 #endif
 	// measure the calibration error
@@ -143,7 +156,7 @@ void test1Y5() {
 	// create diagnostic file
 	{
 
-		std::string fileStr("C:/Temp/liborModel_1Y5_");			// build file path
+		std::string fileStr("C:/Temp/liborModel_1Y5_");		// build file path
 		fileStr.append(boost::posix_time::to_iso_string(
 			boost::posix_time::second_clock::local_time()));
 		fileStr.append(".csv");
@@ -169,8 +182,8 @@ void test1Y5() {
 		file.add(std::string("calculated diff:"), 4, 4);	// calibration result
 		file.add(std::sqrt(ssr), 5, 4);
 		
-		file.add(std::string("individual errors:"), 7, 4);	// individual errors
-		file.add(diff, 8, 4);
+		file.add(std::string("individual errors:"), 21, 1);	// individual errors
+		file.add(diff, 22, 1);
 
 		file.add("volatility array at time zero", 1, 6);	// volatiltity in t=0
 		file.add(volaModel->volatility(0), 2, 6);
@@ -178,8 +191,49 @@ void test1Y5() {
 		file.add("correlation matrix at time zero", 1, 8);	// correlation in t=0
 		file.add(corrModel->correlation(0), 2, 8);		
 		
-		file.add("parameters", 30, 1);						// calibrated parameters
-		file.add(model->params(), 31, 1);
+		file.add("parameters", 7, 4);						// calibrated parameters
+		file.add(model->params(), 8, 4);
+
+		file.add("correlation poarameters", 13, 4);			// parameters used for correlation
+		file.add(a, 14, 4);
+		file.add(b, 15, 4);
+
 	}
+
+	std::cout << "Calibration completed, starting simulation phase." << std::endl;
+	std::cout << "Generating 5000 steps for each path..." << std::endl;
+	Size steps = 5000;
+
+	// step 2: simulation
+	boost::shared_ptr<LiborForwardModelProcess> process(	// create forward process
+		new LiborForwardModelProcess(size_, libor));
+
+	// set-up pricing engine
+	process->setCovarParam(boost::shared_ptr<LfmCovarianceParameterization>(
+		new LfmCovarianceProxy(volaModel, corrModel)));
+
+	// set-up a small Monte-Carlo simulation to price swations
+	typedef PseudoRandom::rsg_type rsg_type;
+	typedef MultiPathGenerator<rsg_type>::sample_type sample_type;
+
+	std::vector<Time> tmp = process->fixingTimes();
+	TimeGrid grid(tmp.begin(), tmp.end(), steps);			// creates time grid
+
+	Size i;
+	std::vector<Size> location;
+	for (i = 0; i < tmp.size(); ++i) {
+		location.push_back(
+			std::find(grid.begin(), grid.end(), tmp[i]) - grid.begin());
+	}
+
+	rsg_type rsg = PseudoRandom::make_sequence_generator(
+		process->factors()*(grid.size() - 1),
+		BigNatural(42));
+
+	const Size nrTrails = 5000;
+	MultiPathGenerator<rsg_type> generator(process, grid, rsg, false);
+
+	boost::shared_ptr<LiborForwardModel>
+		liborModel(new LiborForwardModel(process, volaModel, corrModel));
 
 }

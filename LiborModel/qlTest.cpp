@@ -324,6 +324,9 @@ void LiborMarketModelTest::testSwaptionPricing() {
 		new LmLinearExponentialVolatilityModel(process->fixingTimes(),
 		0.291, 1.483, 0.116, 0.00001));
 
+	boost::shared_ptr<LiborForwardModelProcess> process(
+		new LiborForwardModelProcess(size, index));
+
 	// set-up pricing engine
 	process->setCovarParam(boost::shared_ptr<LfmCovarianceParameterization>(
 		new LfmCovarianceProxy(volaModel, corrModel)));

@@ -3,5 +3,6 @@
 #include "test1Y5grid/test1Y5grid.hpp"
 #include "testGrid/testGrid.hpp"
 #include "testGridSearch/testGridSearch.hpp"
+#include "yieldCurveData/yieldCurveData.hpp"
 
 int main();
