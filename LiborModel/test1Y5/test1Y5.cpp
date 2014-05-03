@@ -154,9 +154,9 @@ void test1Y5() {
 	}
 
 	// create diagnostic file
+	std::string fileStr("C:/Temp/liborModel_1Y5_");		// build file path
 	{
 
-		std::string fileStr("C:/Temp/liborModel_1Y5_");		// build file path
 		fileStr.append(boost::posix_time::to_iso_string(
 			boost::posix_time::second_clock::local_time()));
 		fileStr.append(".csv");
@@ -200,37 +200,44 @@ void test1Y5() {
 
 	}
 
-	std::cout << "Calibration completed, starting simulation phase." << std::endl;
-	std::cout << "Generating 5000 steps for each path..." << std::endl;
-	Size steps = 5000;
+	const Size steps = 1000;								// number of steps
+	const Size nrTrails = 5000;								// number of paths
+
+	std::cout << "Calibration completed, "					// information message
+			  << "starting simulation phase." 
+			  << std::endl
+			  << "Generating "
+			  << boost::lexical_cast<std::string, Size>(nrTrails)
+			  << "with "
+			  << boost::lexical_cast<std::string, Size>(steps)
+			  << "for each path..." 
+			  << std::endl;
+	
 
 	// step 2: simulation
-	boost::shared_ptr<LiborForwardModelProcess> process(	// create forward process
+	boost::shared_ptr<LiborForwardModelProcess> fwdProcess(	// create forward process
 		new LiborForwardModelProcess(size_, libor));
 
-	// set-up pricing engine
-	process->setCovarParam(boost::shared_ptr<LfmCovarianceParameterization>(
-		new LfmCovarianceProxy(volaModel, corrModel)));
+	fwdProcess->setCovarParam(								// set-up pricing engine
+		boost::shared_ptr<LfmCovarianceParameterization>(
+			new LfmCovarianceProxy(volaModel, corrModel)));
 
-	// set-up a small Monte-Carlo simulation to price swations
-	typedef PseudoRandom::rsg_type rsg_type;
+	typedef PseudoRandom::rsg_type rsg_type;				// RNG definitions
 	typedef MultiPathGenerator<rsg_type>::sample_type sample_type;
 
-	std::vector<Time> tmp = process->fixingTimes();
+	std::vector<Time> tmp = fwdProcess->fixingTimes();
 	TimeGrid grid(tmp.begin(), tmp.end(), steps);			// creates time grid
 
-	Size i;
 	std::vector<Size> location;
-	for (i = 0; i < tmp.size(); ++i) {
+	for (Size i = 0; i < tmp.size(); ++i) {
 		location.push_back(
 			std::find(grid.begin(), grid.end(), tmp[i]) - grid.begin());
 	}
 
 	rsg_type rsg = PseudoRandom::make_sequence_generator(
-		process->factors()*(grid.size() - 1),
+		fwdProcess->factors()*(grid.size() - 1),
 		BigNatural(42));
 
-	const Size nrTrails = 5000;
 	MultiPathGenerator<rsg_type> generator(process, grid, rsg, false);
 
 	boost::shared_ptr<LiborForwardModel>
