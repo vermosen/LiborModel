@@ -25,7 +25,8 @@ FOR A PARTICULAR PURPOSE.  See the license for more details.
 #define quantlib_optimization_grid_search_hpp
 
 #include <ql/math/optimization/problem.hpp>
-#include <boost/multi_array.hpp>
+#include <ql/math/optimization/method.hpp>
+#include "MultiGrid.hpp"
 
 namespace QuantLib {
 
@@ -33,45 +34,95 @@ namespace QuantLib {
 	/*! Levenberg-Marquardt based grid-search
 	*/
 
-	class D6MultiGrid {
-
-	public:
-
-		D6MultiGrid();
-
-		void addDimensionStep(
-			Natural position,
-			Real max,
-			Real min,
-			Real step);
-
-		std::vector<Array> results();
-
-	private:
-
-		const Size size_ = 6;
-		Array max_;
-		Array min_;
-		Array step_;
-
-		std::vector<Array> D6MultiGrid::results();
-
-	};
-
+	template <class T>
 	class GridSearch: public OptimizationMethod {
+
 	public:
+
 		GridSearch(
-			Size size,
 			Real epsfcn = 1.0e-8,
 			Real xtol = 1.0e-8,
-			Real gtol = 1.0e-8);
+			Real gtol = 1.0e-8)
+			: grid_(T()), epsfcn_(epsfcn), xtol_(xtol), gtol_(gtol) {};
 
 		virtual EndCriteria::Type minimize(Problem& P,
-			const EndCriteria& endCriteria);
+			const EndCriteria& endCriteria) {
+
+			for (Size i = 0; i < grid_.size(); i++)
+				grid_.addDimensionStep(i, min_[i], max_[i], step_[i]);
+
+			std::vector<Array> guesses = grid_.results();
+
+			std::vector<double> res; res.reserve(guesses.size());
+
+			for (std::vector<Array>::const_iterator It = guesses.cbegin();
+				It != guesses.cend(); It++) {
+
+				try
+				{
+				
+					double result = -P.value(*It);
+					res.push_back(result);
+
+					std::cout 
+						<< "guess "
+						<< *It
+						<< " produced score of "
+						<< result
+						<< std::endl;
+				
+				}
+				catch (std::exception & e)
+				{
+
+					res.push_back(-1000);
+
+					std::cout
+						<< "guess "
+						<< *It
+						<< " produced an error..."
+						<< std::endl
+						<< e.what()
+						<< std::endl;
+
+				}
+				
+			}
+
+			// find the highest result
+			Size t = std::distance(
+				res.cbegin(), std::max_element(res.cbegin(), res.cend()));
+
+			P.setCurrentValue(guesses[t]);
+
+			// TODO: get the max value (quick sort) and associated array
+			return EndCriteria::Type::StationaryFunctionValue;
+
+		};
+
+		void setGrid(
+			const Array & min,
+			const Array & max,
+			const Array & step) {
+
+			QL_REQUIRE(max.size() == grid_.size(), "grid max values has wrong dimensions");
+			QL_REQUIRE(min.size() == grid_.size(), "grid min values has wrong dimensions");
+			QL_REQUIRE(step.size() == grid_.size(), "grid step values has wrong dimensions");
+
+			for (Size i = 0; i < grid_.size(); i++)
+				QL_REQUIRE(max[i] >= min[i],
+				"one of the maximum is lower than its associated minimum");
+
+			max_ = max;
+			min_ = min;
+			step_ = step;
+
+		};
 
 	private:
 
-		Size size_;
+		T grid_;
+
 		Real epsfcn_;
 		Real xtol_;
 		Real gtol_;
@@ -79,13 +130,12 @@ namespace QuantLib {
 		Problem* currentProblem_;
 		Array max_;
 		Array min_;
-		Array stepSize_;
+		Array step_;
 
-		std::vector<boost::shared_ptr<OptimizationMethod> > opt_;
+		std::vector<Array> data_;
 
 	};
 
 }
-
 
 #endif

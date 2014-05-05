@@ -63,51 +63,62 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>QuantLib-vc120-mt-sgd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
+      <SDLCheck>false</SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>QuantLib-vc120-mt-s.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="curveCreation\curveCreation.cpp" />
-    <ClCompile Include="garbage.cpp">
+    <ClCompile Include="MultiGrid.cpp" />
+    <ClCompile Include="qlTest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="GridSearch.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="test1Y10\test1Y10.cpp" />
-    <ClCompile Include="test1Y5new\test1Y5new.cpp" />
+    <ClCompile Include="test1Y5grid\test1Y5grid.cpp" />
     <ClCompile Include="test1Y5\test1Y5.cpp" />
+    <ClCompile Include="testGridSearch\testGridSearch.cpp" />
+    <ClCompile Include="testGrid\testGrid.cpp" />
+    <ClCompile Include="yieldCurveData\yieldCurveData.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Text.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="curveCreation\curveCreation.hpp" />
+    <ClInclude Include="MultiGrid.hpp" />
     <ClInclude Include="GridSearch.hpp" />
     <ClInclude Include="main.hpp" />
     <ClInclude Include="test1Y10\test1Y10.hpp" />
-    <ClInclude Include="test1Y5new\test1Y5new.hpp" />
+    <ClInclude Include="test1Y5grid\test1Y5grid.hpp" />
     <ClInclude Include="test1Y5\test1Y5.hpp" />
+    <ClInclude Include="testGridSearch\testGridSearch.hpp" />
+    <ClInclude Include="testGrid\testGrid.hpp" />
+    <ClInclude Include="yieldCurveData\yieldCurveData.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

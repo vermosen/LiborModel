@@ -18,9 +18,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="garbage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="test1Y10\test1Y10.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -30,10 +27,22 @@
     <ClCompile Include="test1Y5\test1Y5.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="test1Y5new\test1Y5new.cpp">
+    <ClCompile Include="testGrid\testGrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GridSearch.cpp">
+    <ClCompile Include="MultiGrid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="testGridSearch\testGridSearch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="test1Y5grid\test1Y5grid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="qlTest.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="yieldCurveData\yieldCurveData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -53,10 +62,22 @@
     <ClInclude Include="test1Y5\test1Y5.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="test1Y5new\test1Y5new.hpp">
+    <ClInclude Include="GridSearch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GridSearch.hpp">
+    <ClInclude Include="testGrid\testGrid.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiGrid.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="testGridSearch\testGridSearch.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="test1Y5grid\test1Y5grid.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="yieldCurveData\yieldCurveData.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

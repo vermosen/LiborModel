@@ -155,50 +155,46 @@ void test1Y5() {
 
 	// create diagnostic file
 	std::string fileStr("C:/Temp/liborModel_1Y5_");		// build file path
-	{
+	fileStr.append(boost::posix_time::to_iso_string(
+		boost::posix_time::second_clock::local_time()));
+	fileStr.append(".csv");
 
-		fileStr.append(boost::posix_time::to_iso_string(
-			boost::posix_time::second_clock::local_time()));
-		fileStr.append(".csv");
+	utilities::csvBuilder file(fileStr);				// csv builder
 
-		utilities::csvBuilder file(fileStr);				// csv builder
+	Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
 
-		Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
+	for (int i = 0; i < size_; i++) {
 
-		for (int i = 0; i < size_; i++) {
-
-			times[i] = fixingT[i];							// the fixing times from model
-			rates[i] = libor->forwardingTermStructure()->zeroRate(
-				times[i], Continuous);
-
-		}
-
-		file.add("times", 1, 1); file.add("rates", 1, 2);	// adds the yield curve data
-		file.add(times, 2, 1); file.add(rates, 2, 2);
-
-		file.add(std::string("calibration result:"), 1, 4);	// calibration result
-		file.add(model->endCriteria(), 2, 4);
-
-		file.add(std::string("calculated diff:"), 4, 4);	// calibration result
-		file.add(std::sqrt(ssr), 5, 4);
-		
-		file.add(std::string("individual errors:"), 21, 1);	// individual errors
-		file.add(diff, 22, 1);
-
-		file.add("volatility array at time zero", 1, 6);	// volatiltity in t=0
-		file.add(volaModel->volatility(0), 2, 6);
-
-		file.add("correlation matrix at time zero", 1, 8);	// correlation in t=0
-		file.add(corrModel->correlation(0), 2, 8);		
-		
-		file.add("parameters", 7, 4);						// calibrated parameters
-		file.add(model->params(), 8, 4);
-
-		file.add("correlation poarameters", 13, 4);			// parameters used for correlation
-		file.add(a, 14, 4);
-		file.add(b, 15, 4);
+		times[i] = fixingT[i];							// the fixing times from model
+		rates[i] = libor->forwardingTermStructure()->zeroRate(
+			times[i], Continuous);
 
 	}
+
+	file.add("times", 1, 1); file.add("rates", 1, 2);	// adds the yield curve data
+	file.add(times, 2, 1); file.add(rates, 2, 2);
+
+	file.add(std::string("calibration result:"), 1, 4);	// calibration result
+	file.add(model->endCriteria(), 2, 4);
+
+	file.add(std::string("calculated diff:"), 4, 4);	// calibration result
+	file.add(std::sqrt(ssr), 5, 4);
+		
+	file.add(std::string("individual errors:"), 21, 1);	// individual errors
+	file.add(diff, 22, 1);
+
+	file.add("volatility array at time zero", 1, 6);	// volatiltity in t=0
+	file.add(volaModel->volatility(0), 2, 6);
+
+	file.add("correlation matrix at time zero", 1, 8);	// correlation in t=0
+	file.add(corrModel->correlation(0), 2, 8);		
+		
+	file.add("parameters", 7, 4);						// calibrated parameters
+	file.add(model->params(), 8, 4);
+
+	file.add("correlation poarameters", 13, 4);			// parameters used for correlation
+	file.add(a, 14, 4);
+	file.add(b, 15, 4);
 
 	const Size steps = 1000;								// number of steps
 	const Size nrTrails = 5000;								// number of paths
@@ -234,13 +230,34 @@ void test1Y5() {
 			std::find(grid.begin(), grid.end(), tmp[i]) - grid.begin());
 	}
 
+#ifdef _DEBUG
 	rsg_type rsg = PseudoRandom::make_sequence_generator(
 		fwdProcess->factors()*(grid.size() - 1),
-		BigNatural(42));
+		BigNatural(42));									// seed
+#else
+	rsg_type rsg = PseudoRandom::make_sequence_generator(
+		fwdProcess->factors()*(grid.size() - 1),
+		SeedGenerator::instance().get());									// seed
+#endif
+	MultiPathGenerator<rsg_type> generator(fwdProcess, grid, rsg, false);
 
-	MultiPathGenerator<rsg_type> generator(process, grid, rsg, false);
+	// produce 1 simulation
+	Sample<MultiPath> s = generator.next();
+	
+	// copy in a matrix
+	Matrix values(s.value.pathSize(), s.value.assetNumber(), 0.0);
 
-	boost::shared_ptr<LiborForwardModel>
-		liborModel(new LiborForwardModel(process, volaModel, corrModel));
+	for (Size i = 0; i < s.value.pathSize(); i++) {
+	
+		for (Size j = 0; j < s.value.assetNumber(); j++) {
+		
+			values[i][j] = s.value[j][i];
+		
+		}
+	
+	}
+
+	file.add("sample path generated:", 22, 3);
+	file.add(values, 22, 3);
 
 }

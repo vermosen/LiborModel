@@ -7,6 +7,7 @@
 #include <ql/math/optimization/levenbergmarquardt.hpp>
 #include <ql/math/randomnumbers/rngtraits.hpp>
 #include <ql/methods/montecarlo/multipathgenerator.hpp>
+#include <ql/math/randomnumbers/seedgenerator.hpp>
 
 #include "curveCreation/curveCreation.hpp"
 
