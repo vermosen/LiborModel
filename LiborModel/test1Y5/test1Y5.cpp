@@ -127,23 +127,31 @@ void test1Y5() {
 
 	}
 
+	Size maxIterations;
+	Size maxStationaryStateIteration;
+
 #ifdef _DEBUG
 
-	LevenbergMarquardt om(1e-5, 1e-5, 1e-5);
-	model->calibrate(calibrationHelper, om, EndCriteria(100, 20, 1e-5, 1e-5, 1e-6));
+	maxIterations = 100;
+	maxStationaryStateIteration = 20;
 
 #else
+
+	maxIterations = 10000;
+	maxStationaryStateIteration = 100;
+
+#endif
 
 	boost::shared_ptr<OptimizationMethod> om(
 		new LevenbergMarquardt(1e-12, 1e-12, 1e-12));
 
 	model->calibrate(
-		calibrationHelper, *om, 
+		calibrationHelper, *om,
 		EndCriteria(
-			5000, 50, 1e-12, 
-			1e-12, 1e-12));
+		maxIterations, 
+		maxStationaryStateIteration,
+		1e-5, 1e-5, 1e-6));
 
-#endif
 	// measure the calibration error
 	Array diff(calibrationHelper.size(), 0.0);
 	Real ssr = 0.0;
@@ -196,6 +204,7 @@ void test1Y5() {
 	file.add(a, 14, 4);
 	file.add(b, 15, 4);
 
+	// step 2: simulation
 	const Size steps = 1000;								// number of steps
 	const Size nrTrails = 5000;								// number of paths
 
@@ -204,13 +213,11 @@ void test1Y5() {
 			  << std::endl
 			  << "Generating "
 			  << boost::lexical_cast<std::string, Size>(nrTrails)
-			  << "with "
+			  << " with "
 			  << boost::lexical_cast<std::string, Size>(steps)
-			  << "for each path..." 
+			  << " for each path..." 
 			  << std::endl;
-	
-
-	// step 2: simulation
+		
 	boost::shared_ptr<LiborForwardModelProcess> fwdProcess(	// create forward process
 		new LiborForwardModelProcess(size_, libor));
 
@@ -230,15 +237,18 @@ void test1Y5() {
 			std::find(grid.begin(), grid.end(), tmp[i]) - grid.begin());
 	}
 
+	BigNatural seed;
+
 #ifdef _DEBUG
-	rsg_type rsg = PseudoRandom::make_sequence_generator(
-		fwdProcess->factors()*(grid.size() - 1),
-		BigNatural(42));									// seed
+	seed = 42;
 #else
+	seed = SeedGenerator::instance().get();									// seed
+#endif
+	
 	rsg_type rsg = PseudoRandom::make_sequence_generator(
 		fwdProcess->factors()*(grid.size() - 1),
-		SeedGenerator::instance().get());									// seed
-#endif
+		seed);
+
 	MultiPathGenerator<rsg_type> generator(fwdProcess, grid, rsg, false);
 
 	// produce 1 simulation
@@ -249,11 +259,8 @@ void test1Y5() {
 
 	for (Size i = 0; i < s.value.pathSize(); i++) {
 	
-		for (Size j = 0; j < s.value.assetNumber(); j++) {
-		
+		for (Size j = 0; j < s.value.assetNumber(); j++)
 			values[i][j] = s.value[j][i];
-		
-		}
 	
 	}
 
