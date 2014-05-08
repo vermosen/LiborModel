@@ -21,7 +21,7 @@ boost::shared_ptr<LiborForwardModel> & modelConstruction(
 			  << std::endl;
 
 	double a = .35;										//custom a
-	if (force == true) {
+	if (force == false) {
 	
 		std::cout << "please enter correlation parameter 1:"
 			<< std::endl;
@@ -30,7 +30,7 @@ boost::shared_ptr<LiborForwardModel> & modelConstruction(
 	}
 	
 	double b = 0.65;									//custom b
-	if (force == true) {
+	if (force == false) {
 
 		std::cout << "please enter correlation parameter 1:"
 			<< std::endl;
@@ -43,8 +43,6 @@ boost::shared_ptr<LiborForwardModel> & modelConstruction(
 	const Real tolerance_ = 8e-3;						// tolerance
 	Date pricingDate =									// pricing date
 		Settings::instance().evaluationDate();
-
-	boost::shared_ptr<IborIndex> libor = curveCreation();
 
 	std::vector<swaptionData> swaptions					// swaption data
 		= std::vector<swaptionData> {
@@ -169,7 +167,7 @@ boost::shared_ptr<LiborForwardModel> & modelConstruction(
 
 	for (i = 0; i < swaptions.size(); i++) {
 
-		if (swaptions[i].lenght_ + swaptions[i].maturity_ <= max) {
+		if (swaptions[i].lenght_ + swaptions[i].maturity_ <= Period(max, Years)) {
 
 			Handle<Quote> swaptionVol(
 				boost::shared_ptr<Quote>(

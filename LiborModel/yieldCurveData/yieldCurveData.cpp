@@ -8,7 +8,7 @@
 *
 */
 
-#include "test1Y5/test1Y5.hpp"
+#include "yieldCurveData/yieldCurveData.hpp"
 
 void yieldCurveData() {
 

@@ -43,6 +43,7 @@ int main() {
 		std::cout << "1 - 10Y1 max maturity" << std::endl;
 		std::cout << "2 - 5Y1 max maturity" << std::endl;
 		std::cout << "3 - 5Y1 with default parameters" << std::endl;
+		std::cout << "4 - curve data check" << std::endl;
 		
 		std::cin >> i;
 
@@ -59,13 +60,16 @@ int main() {
 			case 3:
 				lfm = modelConstruction(curve, 6, file, true);
 				break;
+			case 4: 
+				yieldCurveData();
+				break;
 			default:
 				throw std::exception("wrong test selected");
 		
 		}
 
-		// step 3 : model simulation
-		modelSimulation(lfm, file);
+		// step 3 : model pricing
+		modelPricing(lfm, curve, file);
 
 		system("pause");
 		return 0;
