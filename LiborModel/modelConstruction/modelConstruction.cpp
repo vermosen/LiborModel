@@ -10,9 +10,9 @@
 
 #include "modelConstruction/modelConstruction.hpp"
 
-boost::shared_ptr<LiborForwardModel> & modelConstruction(
-	const boost::shared_ptr<IborIndex> & libor,
-	const Real & max,
+boost::shared_ptr<LiborForwardModel> modelConstruction(
+	boost::shared_ptr<IborIndex> & libor,
+	const Natural & max,
 	utilities::csvBuilder & file,
 	bool force) {
 

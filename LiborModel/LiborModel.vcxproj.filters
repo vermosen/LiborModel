@@ -39,7 +39,10 @@
     <ClCompile Include="modelConstruction\modelConstruction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="modelPricing\modelPricing.cpp">
+    <ClCompile Include="swaption\europeanSwaption\europeanSwaption.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="swaption\americanSwaption\americanSwaption.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -71,7 +74,10 @@
     <ClInclude Include="modelConstruction\modelConstruction.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="modelPricing\modelPricing.hpp">
+    <ClInclude Include="swaption\europeanSwaption\europeanSwaption.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="swaption\americanSwaption\americanSwaption.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

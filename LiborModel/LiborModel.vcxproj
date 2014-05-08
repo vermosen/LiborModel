@@ -92,7 +92,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="curveCreation\curveCreation.cpp" />
-    <ClCompile Include="modelPricing\modelPricing.cpp" />
+    <ClCompile Include="swaption\americanSwaption\americanSwaption.cpp" />
+    <ClCompile Include="swaption\europeanSwaption\europeanSwaption.cpp" />
     <ClCompile Include="MultiGrid.cpp" />
     <ClCompile Include="qlTest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -109,7 +110,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="curveCreation\curveCreation.hpp" />
-    <ClInclude Include="modelPricing\modelPricing.hpp" />
+    <ClInclude Include="swaption\americanSwaption\americanSwaption.hpp" />
+    <ClInclude Include="swaption\europeanSwaption\europeanSwaption.hpp" />
     <ClInclude Include="MultiGrid.hpp" />
     <ClInclude Include="GridSearch.hpp" />
     <ClInclude Include="main.hpp" />

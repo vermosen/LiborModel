@@ -1,5 +1,5 @@
-#ifndef model_simulation
-#define model_simulation
+#ifndef european_swaption
+#define european_swaption
 
 #include <ql/legacy/all.hpp>
 #include <ql/utilities/csvbuilder.hpp>
@@ -11,9 +11,9 @@
 
 #include "curveCreation/curveCreation.hpp"
 
-void modelPricing(
-	const boost::shared_ptr<LiborForwardModel> &,
-	const boost::shared_ptr<IborIndex> &,
+void europeanSwaption(
+	boost::shared_ptr<LiborForwardModel> &,
+	boost::shared_ptr<IborIndex> &,
 	utilities::csvBuilder &);
 
 #endif
