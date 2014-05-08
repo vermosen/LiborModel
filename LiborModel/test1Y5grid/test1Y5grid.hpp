@@ -10,6 +10,6 @@
 #include "curveCreation/curveCreation.hpp"
 #include "GridSearch.hpp"
 
-void test1Y5Grid();
+void test1Y5Grid(const IborIndex &, bool);
 
 #endif

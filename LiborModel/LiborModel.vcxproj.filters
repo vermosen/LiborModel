@@ -18,13 +18,7 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="test1Y10\test1Y10.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="curveCreation\curveCreation.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="test1Y5\test1Y5.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="testGrid\testGrid.cpp">
@@ -36,13 +30,16 @@
     <ClCompile Include="testGridSearch\testGridSearch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="test1Y5grid\test1Y5grid.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="qlTest.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="yieldCurveData\yieldCurveData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="modelConstruction\modelConstruction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="modelPricing\modelPricing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -50,16 +47,10 @@
     <Text Include="Text.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="test1Y10\test1Y10.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="curveCreation\curveCreation.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="main.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="test1Y5\test1Y5.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GridSearch.hpp">
@@ -74,10 +65,13 @@
     <ClInclude Include="testGridSearch\testGridSearch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="test1Y5grid\test1Y5grid.hpp">
+    <ClInclude Include="yieldCurveData\yieldCurveData.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="yieldCurveData\yieldCurveData.hpp">
+    <ClInclude Include="modelConstruction\modelConstruction.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="modelPricing\modelPricing.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

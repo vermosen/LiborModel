@@ -8,35 +8,48 @@
 *
 */
 
-#include "test1Y5/test1Y5.hpp"
+#include "modelConstruction/modelConstruction.hpp"
 
-void test1Y5() {
+boost::shared_ptr<LiborForwardModel> & modelConstruction(
+	const boost::shared_ptr<IborIndex> & libor,
+	const Real & max,
+	utilities::csvBuilder & file,
+	bool force) {
 
-	std::cout << "Testing calibration of a Libor forward model with 1Y5 settings..."
-		<< std::endl;
-
-	double a = 0.0;										//custom a
-	std::cout << "please enter correlation parameter 1 (0 default):" 
+	std::cout << "Calibration of a "
+			  << "Libor forward model"
 			  << std::endl;
-	std::cin >> a;
-	(a == 0.0 ? a = 0.65 : true);
+
+	double a = .35;										//custom a
+	if (force == true) {
 	
-	double b = 0.0;										// custom b
-	std::cout << "please enter correlation parameter 2 (0 default):" 
-			  << std::endl;
-	std::cin >> b;
-	(b == 0.0 ? b = 0.65 : true);
+		std::cout << "please enter correlation parameter 1:"
+			<< std::endl;
+		std::cin >> a;
+	
+	}
+	
+	double b = 0.65;									//custom b
+	if (force == true) {
+
+		std::cout << "please enter correlation parameter 1:"
+			<< std::endl;
+		std::cin >> b;
+
+	}
 
 	SavedSettings backup;								// basic settings
 	const Size size_ = 18;								// 24 trimesters
 	const Real tolerance_ = 8e-3;						// tolerance
+	Date pricingDate =									// pricing date
+		Settings::instance().evaluationDate();
 
 	boost::shared_ptr<IborIndex> libor = curveCreation();
 
 	std::vector<swaptionData> swaptions					// swaption data
 		= std::vector<swaptionData> {
 
-			//{ 50.200, Period(1, Months), Period(1, Years) },
+		//{ 50.200, Period(1, Months), Period(1, Years) },
 			{ 54.475, Period(3, Months), Period(1, Years) },
 			{ 63.350, Period(6, Months), Period(1, Years) },
 			//{ 68.650, Period(1, Years), Period(1, Years) },
@@ -44,6 +57,11 @@ void test1Y5() {
 			//{ 38.500, Period(3, Years), Period(1, Years) },
 			//{ 31.900, Period(4, Years), Period(1, Years) },
 			//{ 28.500, Period(5, Years), Period(1, Years) },
+			{ 26.500, Period(6, Years), Period(1, Years) },
+			{ 24.625, Period(7, Years), Period(1, Years) },
+			{ 23.500, Period(8, Years), Period(1, Years) },
+			{ 22.550, Period(9, Years), Period(1, Years) },
+			{ 21.150, Period(10, Years), Period(1, Years) },
 			//{ 60.950, Period(1, Months), Period(2, Years) },
 			{ 55.700, Period(3, Months), Period(2, Years) },
 			{ 58.100, Period(6, Months), Period(2, Years) },
@@ -51,28 +69,75 @@ void test1Y5() {
 			//{ 42.600, Period(2, Years), Period(2, Years) },
 			//{ 34.300, Period(3, Years), Period(2, Years) },
 			//{ 29.400, Period(4, Years), Period(2, Years) },
+			{ 26.900, Period(5, Years), Period(2, Years) },
+			{ 25.050, Period(6, Years), Period(2, Years) },
+			{ 23.800, Period(7, Years), Period(2, Years) },
+			{ 22.700, Period(8, Years), Period(2, Years) },
+			{ 21.600, Period(9, Years), Period(2, Years) },
 			{ 51.050, Period(1, Months), Period(3, Years) },
 			{ 48.300, Period(3, Months), Period(3, Years) },
 			{ 48.900, Period(6, Months), Period(3, Years) },
 			{ 47.000, Period(1, Years), Period(3, Years) },
 			//{ 37.000, Period(2, Years), Period(3, Years) },
 			//{ 31.275, Period(3, Years), Period(3, Years) },
+			{ 27.650, Period(4, Years), Period(3, Years) },
+			{ 25.650, Period(5, Years), Period(3, Years) },
+			{ 24.200, Period(6, Years), Period(3, Years) },
+			{ 23.050, Period(7, Years), Period(3, Years) },
+			{ 22.050, Period(8, Years), Period(3, Years) },
 			{ 40.800, Period(1, Months), Period(4, Years) },
 			{ 40.225, Period(3, Months), Period(4, Years) },
 			{ 40.200, Period(6, Months), Period(4, Years) },
 			{ 39.300, Period(1, Years), Period(4, Years) },
 			//{ 32.800, Period(2, Years), Period(4, Years) },
+			{ 28.925, Period(3, Years), Period(4, Years) },
+			{ 26.150, Period(4, Years), Period(4, Years) },
+			{ 24.650, Period(5, Years), Period(4, Years) },
+			{ 23.500, Period(6, Years), Period(4, Years) },
+			{ 22.350, Period(7, Years), Period(4, Years) },
 			{ 36.025, Period(1, Months), Period(5, Years) },
 			{ 35.600, Period(3, Months), Period(5, Years) },
 			{ 35.425, Period(6, Months), Period(5, Years) },
 			{ 34.250, Period(1, Years), Period(5, Years) },
+			{ 29.850, Period(2, Years), Period(5, Years) },
+			{ 26.900, Period(3, Years), Period(5, Years) },
+			{ 24.925, Period(4, Years), Period(5, Years) },
+			{ 23.700, Period(5, Years), Period(5, Years) },
+			{ 22.750, Period(6, Years), Period(5, Years) },
 			{ 30.800, Period(1, Months), Period(6, Years) },
 			{ 30.700, Period(3, Months), Period(6, Years) },
 			//{ 31.200, Period(6, Months), Period(6, Years) },
-			{ 30.750, Period(1, Years), Period(6, Years) }
+			{ 30.750, Period(1, Years), Period(6, Years) },
+			{ 27.850, Period(2, Years), Period(6, Years) },
+			{ 25.775, Period(3, Years), Period(6, Years) },
+			{ 24.125, Period(4, Years), Period(6, Years) },
+			{ 23.100, Period(5, Years), Period(6, Years) },
+			{ 27.600, Period(1, Months), Period(7, Years) },
+			{ 27.750, Period(3, Months), Period(7, Years) },
+			{ 28.350, Period(6, Months), Period(7, Years) },
+			{ 28.200, Period(1, Years), Period(7, Years) },
+			{ 26.400, Period(2, Years), Period(7, Years) },
+			{ 24.750, Period(3, Years), Period(7, Years) },
+			{ 23.400, Period(4, Years), Period(7, Years) },
+			{ 25.250, Period(1, Months), Period(8, Years) },
+			{ 25.450, Period(3, Months), Period(8, Years) },
+			{ 26.000, Period(6, Months), Period(8, Years) },
+			{ 26.250, Period(1, Years), Period(8, Years) },
+			{ 25.225, Period(2, Years), Period(8, Years) },
+			{ 23.875, Period(3, Years), Period(8, Years) },
+			{ 23.575, Period(1, Months), Period(9, Years) },
+			{ 23.575, Period(3, Months), Period(9, Years) },
+			{ 24.600, Period(6, Months), Period(9, Years) },
+			{ 24.800, Period(1, Years), Period(9, Years) },
+			{ 24.150, Period(2, Years), Period(9, Years) },
+			{ 22.275, Period(1, Months), Period(10, Years) },
+			{ 22.125, Period(3, Months), Period(10, Years) },
+			{ 23.300, Period(6, Months), Period(10, Years) },
+			{ 23.600, Period(1, Years), Period(10, Years) }
 	};
 
-	Handle<YieldTermStructure> termStructure = libor->forwardingTermStructure();
+	Handle<YieldTermStructure> termStructure =				// ts handle
+		libor->forwardingTermStructure();
 
 	// set up the process
 	boost::shared_ptr<LiborForwardModelProcess> process(
@@ -87,9 +152,6 @@ void test1Y5() {
 
 	boost::shared_ptr<LmCorrelationModel> underlyingCorrModel(
 		new LmLinearExponentialCorrelationModel(size_, a, b, 3));
-
-	//boost::shared_ptr<LmCorrelationModel> underlyingCorrModel( // todo: calibrate on real data
-	//	new LmExponentialCorrelationModel(size_, 0.01));
 
 	boost::shared_ptr<LmCorrelationModel> corrModel(
 		new LmConstWrapperCorrelationModel(underlyingCorrModel));
@@ -107,24 +169,27 @@ void test1Y5() {
 
 	for (i = 0; i < swaptions.size(); i++) {
 
-		Handle<Quote> swaptionVol(
-			boost::shared_ptr<Quote>(
-			new SimpleQuote(swaptions[i].volatility_ / 100)));
+		if (swaptions[i].lenght_ + swaptions[i].maturity_ <= max) {
 
-		boost::shared_ptr<CalibrationHelper> swaptionHelper(
-			new SwaptionHelper(swaptions[i].lenght_,
-			swaptions[i].maturity_, swaptionVol, libor,
-			libor->tenor(), dayCounter,
-			libor->dayCounter(),
-			termStructure,
-			CalibrationHelper::ImpliedVolError));
+			Handle<Quote> swaptionVol(
+				boost::shared_ptr<Quote>(
+				new SimpleQuote(swaptions[i].volatility_ / 100)));
 
-		swaptionHelper->setPricingEngine(
-			boost::shared_ptr<PricingEngine>(
-			new LfmSwaptionEngine(model, termStructure)));
+			boost::shared_ptr<CalibrationHelper> swaptionHelper(
+				new SwaptionHelper(swaptions[i].lenght_,
+				swaptions[i].maturity_, swaptionVol, libor,
+				libor->tenor(), dayCounter,
+				libor->dayCounter(),
+				termStructure,
+				CalibrationHelper::ImpliedVolError));
 
-		calibrationHelper.push_back(swaptionHelper);
+			swaptionHelper->setPricingEngine(
+				boost::shared_ptr<PricingEngine>(
+				new LfmSwaptionEngine(model, termStructure)));
 
+			calibrationHelper.push_back(swaptionHelper);
+
+		}
 	}
 
 	Size maxIterations;
@@ -160,14 +225,6 @@ void test1Y5() {
 		diff[i] = calibrationHelper[i]->calibrationError();
 		ssr = ssr + diff[i] * diff[i];
 	}
-
-	// create diagnostic file
-	std::string fileStr("C:/Temp/liborModel_1Y5_");		// build file path
-	fileStr.append(boost::posix_time::to_iso_string(
-		boost::posix_time::second_clock::local_time()));
-	fileStr.append(".csv");
-
-	utilities::csvBuilder file(fileStr);				// csv builder
 
 	Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
 
@@ -267,4 +324,6 @@ void test1Y5() {
 	file.add("sample path generated:", 22, 3);
 	file.add(values, 22, 3);
 
+	return model;
+	
 }

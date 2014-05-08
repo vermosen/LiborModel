@@ -15,43 +15,57 @@ int main() {
 		/* basic settings */
 		SavedSettings backup;
 
+		std::string fileStr("C:/Temp/liborModel_1Y5_");		// build file path
+		fileStr.append(boost::posix_time::to_iso_string(
+			boost::posix_time::second_clock::local_time()));
+		fileStr.append(".csv");
+
+		utilities::csvBuilder file(fileStr);				// csv builder
+
+		// step 1: curve creation
+		std::cout << "step 1 : curve creation" << std::endl;
+		std::cout << "-----------------------" << std::endl;
+
+		boost::shared_ptr<IborIndex> curve = curveCreation();
+
+		std::cout << "curve initialization completed." 
+				  << std::endl 
+				  << std::endl;
+
+		// step 2: vol term structure
+		std::cout << "step 2 : Market Model Setup" << std::endl;
+		std::cout << "---------------------------" << std::endl;
+
 		int i;
-		std::cout << "please select the appropriate test:" << std::endl;
-		std::cout << "-----------------------------------" << std::endl;
+
+		std::cout << "please select the appropriate procudure:" 
+				  << std::endl;
 		std::cout << "1 - 10Y1 max maturity" << std::endl;
 		std::cout << "2 - 5Y1 max maturity" << std::endl;
-		std::cout << "3 - 5Y1 grid version" << std::endl;
-		std::cout << "4 - grid building test" << std::endl;
-		std::cout << "5 - grid search test" << std::endl;
-		std::cout << "6 - obtain yield curve data" << std::endl;
-
+		std::cout << "3 - 5Y1 with default parameters" << std::endl;
+		
 		std::cin >> i;
 
-		/* calling the right test */
-		switch (i) {
+		boost::shared_ptr<LiborForwardModel> lfm;
+		
+		switch (i) {								// calling the test
 
 			case 1:
-				test1Y10();
+				lfm = modelConstruction(curve, 11, file, false);
 				break;
 			case 2:
-				test1Y5();
+				lfm = modelConstruction(curve, 6, file, false);
 				break;
 			case 3:
-				test1Y5Grid();
-				break;
-			case 4:
-				testGrid();
-				break;
-			case 5:
-				testGridSearch();
-				break;
-			case 6:
-				yieldCurveData();
+				lfm = modelConstruction(curve, 6, file, true);
 				break;
 			default:
 				throw std::exception("wrong test selected");
 		
 		}
+
+		// step 3 : model simulation
+		modelSimulation(lfm, file);
 
 		system("pause");
 		return 0;

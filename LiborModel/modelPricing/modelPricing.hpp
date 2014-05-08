@@ -1,5 +1,5 @@
-#ifndef test_1y5
-#define test_1Y5
+#ifndef model_simulation
+#define model_simulation
 
 #include <ql/legacy/all.hpp>
 #include <ql/utilities/csvbuilder.hpp>
@@ -11,6 +11,9 @@
 
 #include "curveCreation/curveCreation.hpp"
 
-void test1Y5();
+void modelPricing(
+	const boost::shared_ptr<LiborForwardModel> &,
+	const boost::shared_ptr<IborIndex> &,
+	utilities::csvBuilder &);
 
 #endif

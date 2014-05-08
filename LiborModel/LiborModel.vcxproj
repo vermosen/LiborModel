@@ -92,15 +92,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="curveCreation\curveCreation.cpp" />
+    <ClCompile Include="modelPricing\modelPricing.cpp" />
     <ClCompile Include="MultiGrid.cpp" />
     <ClCompile Include="qlTest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="test1Y10\test1Y10.cpp" />
-    <ClCompile Include="test1Y5grid\test1Y5grid.cpp" />
-    <ClCompile Include="test1Y5\test1Y5.cpp" />
+    <ClCompile Include="modelConstruction\modelConstruction.cpp" />
     <ClCompile Include="testGridSearch\testGridSearch.cpp" />
     <ClCompile Include="testGrid\testGrid.cpp" />
     <ClCompile Include="yieldCurveData\yieldCurveData.cpp" />
@@ -110,12 +109,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="curveCreation\curveCreation.hpp" />
+    <ClInclude Include="modelPricing\modelPricing.hpp" />
     <ClInclude Include="MultiGrid.hpp" />
     <ClInclude Include="GridSearch.hpp" />
     <ClInclude Include="main.hpp" />
-    <ClInclude Include="test1Y10\test1Y10.hpp" />
-    <ClInclude Include="test1Y5grid\test1Y5grid.hpp" />
-    <ClInclude Include="test1Y5\test1Y5.hpp" />
+    <ClInclude Include="modelConstruction\modelConstruction.hpp" />
     <ClInclude Include="testGridSearch\testGridSearch.hpp" />
     <ClInclude Include="testGrid\testGrid.hpp" />
     <ClInclude Include="yieldCurveData\yieldCurveData.hpp" />

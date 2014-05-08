@@ -10,7 +10,8 @@
 
 #include "test1Y10/test1Y10.hpp"
 
-void test1Y10() {
+void test1Y10(boost::shared_ptr<IborIndex> libor,
+			  utilities::csvBuilder & file) {
 
 	std::cout << "Testing calibration of a Libor forward model with 1Y10 settings..."
 		<< std::endl;
@@ -27,26 +28,26 @@ void test1Y10() {
 	std::vector<swaptionData> swaptions					// swaption data
 		= std::vector<swaptionData> {
 
-			{ 50.200, Period(1, Months), Period(1, Years) },
+			//{ 50.200, Period(1, Months), Period(1, Years) },
 			{ 54.475, Period(3, Months), Period(1, Years) },
 			{ 63.350, Period(6, Months), Period(1, Years) },
-			{ 68.650, Period(1, Years), Period(1, Years) },
-			{ 49.850, Period(2, Years), Period(1, Years) },
-			{ 38.500, Period(3, Years), Period(1, Years) },
-			{ 31.900, Period(4, Years), Period(1, Years) },
-			{ 28.500, Period(5, Years), Period(1, Years) },
+			//{ 68.650, Period(1, Years), Period(1, Years) },
+			//{ 49.850, Period(2, Years), Period(1, Years) },
+			//{ 38.500, Period(3, Years), Period(1, Years) },
+			//{ 31.900, Period(4, Years), Period(1, Years) },
+			//{ 28.500, Period(5, Years), Period(1, Years) },
 			{ 26.500, Period(6, Years), Period(1, Years) },
 			{ 24.625, Period(7, Years), Period(1, Years) },
 			{ 23.500, Period(8, Years), Period(1, Years) },
 			{ 22.550, Period(9, Years), Period(1, Years) },
 			{ 21.150, Period(10, Years), Period(1, Years) },
-			{ 60.950, Period(1, Months), Period(2, Years) },
+			//{ 60.950, Period(1, Months), Period(2, Years) },
 			{ 55.700, Period(3, Months), Period(2, Years) },
 			{ 58.100, Period(6, Months), Period(2, Years) },
 			{ 56.550, Period(1, Years), Period(2, Years) },
-			{ 42.600, Period(2, Years), Period(2, Years) },
-			{ 34.300, Period(3, Years), Period(2, Years) },
-			{ 29.400, Period(4, Years), Period(2, Years) },
+			//{ 42.600, Period(2, Years), Period(2, Years) },
+			//{ 34.300, Period(3, Years), Period(2, Years) },
+			//{ 29.400, Period(4, Years), Period(2, Years) },
 			{ 26.900, Period(5, Years), Period(2, Years) },
 			{ 25.050, Period(6, Years), Period(2, Years) },
 			{ 23.800, Period(7, Years), Period(2, Years) },
@@ -56,8 +57,8 @@ void test1Y10() {
 			{ 48.300, Period(3, Months), Period(3, Years) },
 			{ 48.900, Period(6, Months), Period(3, Years) },
 			{ 47.000, Period(1, Years), Period(3, Years) },
-			{ 37.000, Period(2, Years), Period(3, Years) },
-			{ 31.275, Period(3, Years), Period(3, Years) },
+			//{ 37.000, Period(2, Years), Period(3, Years) },
+			//{ 31.275, Period(3, Years), Period(3, Years) },
 			{ 27.650, Period(4, Years), Period(3, Years) },
 			{ 25.650, Period(5, Years), Period(3, Years) },
 			{ 24.200, Period(6, Years), Period(3, Years) },
@@ -67,7 +68,7 @@ void test1Y10() {
 			{ 40.225, Period(3, Months), Period(4, Years) },
 			{ 40.200, Period(6, Months), Period(4, Years) },
 			{ 39.300, Period(1, Years), Period(4, Years) },
-			{ 32.800, Period(2, Years), Period(4, Years) },
+			//{ 32.800, Period(2, Years), Period(4, Years) },
 			{ 28.925, Period(3, Years), Period(4, Years) },
 			{ 26.150, Period(4, Years), Period(4, Years) },
 			{ 24.650, Period(5, Years), Period(4, Years) },
@@ -84,7 +85,7 @@ void test1Y10() {
 			{ 22.750, Period(6, Years), Period(5, Years) },
 			{ 30.800, Period(1, Months), Period(6, Years) },
 			{ 30.700, Period(3, Months), Period(6, Years) },
-			{ 31.200, Period(6, Months), Period(6, Years) },
+			//{ 31.200, Period(6, Months), Period(6, Years) },
 			{ 30.750, Period(1, Years), Period(6, Years) },
 			{ 27.850, Period(2, Years), Period(6, Years) },
 			{ 25.775, Period(3, Years), Period(6, Years) },

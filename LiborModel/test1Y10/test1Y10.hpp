@@ -9,6 +9,6 @@
 #include "curveCreation/curveCreation.hpp"
 #include "GridSearch.hpp"
 
-void test1Y10();
+void test1Y10(const boost::shared_ptr<IborIndex> &, utilities::csvBuilder &);
 
 #endif
