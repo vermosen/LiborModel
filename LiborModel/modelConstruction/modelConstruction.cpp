@@ -163,9 +163,7 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	// set-up calibration helper
 	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
 
-	Size i;
-
-	for (i = 0; i < swaptions.size(); i++) {
+	for (Size i = 0, Size j = 0; i < swaptions.size(); i++) {
 
 		if (swaptions[i].lenght_ + swaptions[i].maturity_ <= Period(max, Years)) {
 
@@ -187,6 +185,23 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 
 			calibrationHelper.push_back(swaptionHelper);
 
+			// copy data to the file
+			file.add(
+				libor->fixingCalendar().advance(
+				pricingDate, swaptions[i].lenght_).serialNumber(),
+				j + 2, 27);
+
+			file.add(
+				libor->fixingCalendar().advance(
+				pricingDate, swaptions[i].maturity_).serialNumber(),
+				j + 2, 28);
+
+			file.add(100 * calibrationHelper[i]->blackPrice(
+				swaptions[i].volatility_ / 100), j + 2, 29);
+
+			file.add(swaptions[i].volatility_, j + 2, 30);
+
+			j += 1;
 		}
 	}
 
@@ -218,7 +233,7 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	// measure the calibration error
 	Array diff(calibrationHelper.size(), 0.0);
 	Real ssr = 0.0;
-	for (i = 0; i < calibrationHelper.size(); ++i) {
+	for (Size i = 0; i < calibrationHelper.size(); ++i) {
 
 		diff[i] = calibrationHelper[i]->calibrationError();
 		ssr = ssr + diff[i] * diff[i];
@@ -226,7 +241,7 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 
 	Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
 
-	for (int i = 0; i < size_; i++) {
+	for (Size i = 0; i < size_; i++) {
 
 		times[i] = fixingT[i];							// the fixing times from model
 		rates[i] = libor->forwardingTermStructure()->zeroRate(
@@ -327,25 +342,6 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	file.add("maturity date", 1, 28);
 	file.add("premium", 1, 29);
 	file.add("implied volatility", 1, 30);
-	
-	for (Size i = 0; i < calibrationHelper.size(); i++) {
-	
-		file.add(
-			libor->fixingCalendar().advance(
-				pricingDate, swaptions[i].lenght_).serialNumber(), 
-			i + 2, 27);
-
-		file.add(
-			libor->fixingCalendar().advance(
-				pricingDate, swaptions[i].lenght_).serialNumber(),
-			i + 2, 28);
-
-		file.add(100 * calibrationHelper[i]->blackPrice(
-			swaptions[i].volatility_ / 100), i + 2, 29);
-
-		file.add(swaptions[i].volatility_, i + 2, 30);
-	
-	}
 
 	return model;
 	
