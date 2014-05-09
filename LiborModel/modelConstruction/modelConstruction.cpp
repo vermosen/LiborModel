@@ -323,7 +323,29 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	file.add(values, 22, 3);
 
 	// copy the calibration data
+	file.add("expiry date", 1, 27);
+	file.add("maturity date", 1, 28);
+	file.add("premium", 1, 29);
+	file.add("implied volatility", 1, 30);
+	
+	for (Size i = 0; i < calibrationHelper.size(); i++) {
+	
+		file.add(
+			libor->fixingCalendar().advance(
+				pricingDate, swaptions[i].lenght_).serialNumber(), 
+			i + 2, 27);
 
+		file.add(
+			libor->fixingCalendar().advance(
+				pricingDate, swaptions[i].lenght_).serialNumber(),
+			i + 2, 28);
+
+		file.add(100 * calibrationHelper[i]->blackPrice(
+			swaptions[i].volatility_ / 100), i + 2, 29);
+
+		file.add(swaptions[i].volatility_, i + 2, 30);
+	
+	}
 
 	return model;
 	
