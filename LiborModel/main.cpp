@@ -71,6 +71,7 @@ int main() {
 		// step 3 : model pricing
 		europeanSwaption(lfm, curve, file);
 		americanSwaption(lfm, curve, file);
+		bermudeanSwaption(lfm, curve, file);
 
 		system("pause");
 		return 0;

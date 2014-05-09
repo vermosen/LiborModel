@@ -8,9 +8,9 @@
 *
 */
 
-#include "swaption/americanSwaption/americanSwaption.hpp"
+#include "swaption/bermudeanSwaption/bermudeanSwaption.hpp"
 
-void americanSwaption(
+void bermudeanSwaption(
 	boost::shared_ptr<LiborForwardModel> & lfm,
 	boost::shared_ptr<IborIndex> & libor,
 	utilities::csvBuilder & file) {
@@ -60,8 +60,27 @@ void americanSwaption(
 	boost::shared_ptr<PricingEngine> engine(
 		new LfmSwaptionEngine(lfm,
 		libor->forwardingTermStructure()));
+
+	std::vector<Date> dates;							// dates for payment
+	dates.push_back(
+		libor->fixingCalendar().advance(
+			optionStart, Period(1, Months)));
+	dates.push_back(
+		libor->fixingCalendar().advance(
+		optionStart, Period(2, Months)));
+	dates.push_back(
+		libor->fixingCalendar().advance(
+		optionStart, Period(3, Months)));
+	dates.push_back(
+		libor->fixingCalendar().advance(
+		optionStart, Period(4, Months)));
+	dates.push_back(
+		libor->fixingCalendar().advance(
+		optionStart, Period(5, Months)));
+	dates.push_back(optionEnd);
+		
 	boost::shared_ptr<Exercise> exercise(
-		new AmericanExercise(optionEnd));
+		new BermudanExercise(dates));
 
 	boost::shared_ptr<Swaption> americanSwaption(		// create the swaption
 		new Swaption(forwardSwap, exercise));
@@ -69,7 +88,7 @@ void americanSwaption(
 
 	Real npv = americanSwaption->NPV();
 	
-	std::cout << "American swaption npv: "											// information
+	std::cout << "Bermudean swaption npv: "											// information
 			  << npv
 			  << std::endl;
 			  

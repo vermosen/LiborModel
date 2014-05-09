@@ -3,4 +3,6 @@
 #include "yieldCurveData/yieldCurveData.hpp"
 #include "swaption/europeanSwaption/europeanSwaption.hpp"
 #include "swaption/americanSwaption/americanSwaption.hpp"
+#include "swaption/bermudeanSwaption/bermudeanSwaption.hpp"
+
 int main();

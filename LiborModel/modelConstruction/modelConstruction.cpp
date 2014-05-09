@@ -20,19 +20,19 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 			  << "Libor forward model"
 			  << std::endl;
 
-	double a = .35;										//custom a
+	double a = .5;										//custom a
 	if (force == false) {
 	
-		std::cout << "please enter correlation parameter 1:"
+		std::cout << "please enter correlation parameter a:"
 			<< std::endl;
 		std::cin >> a;
 	
 	}
 	
-	double b = 0.65;									//custom b
+	double b = .1;									//custom b
 	if (force == false) {
 
-		std::cout << "please enter correlation parameter 1:"
+		std::cout << "please enter correlation parameter b:"
 			<< std::endl;
 		std::cin >> b;
 
@@ -321,6 +321,9 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 
 	file.add("sample path generated:", 22, 3);
 	file.add(values, 22, 3);
+
+	// copy the calibration data
+
 
 	return model;
 	

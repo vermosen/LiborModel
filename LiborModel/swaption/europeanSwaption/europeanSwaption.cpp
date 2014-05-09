@@ -18,7 +18,7 @@ void europeanSwaption(
 	Date pricingDate =									// pricing date
 		Settings::instance().evaluationDate();
 
-	Date fwdStart = libor->fixingCalendar().advance(						// 3Y*6M
+	Date fwdStart = libor->fixingCalendar().advance(	// 3Y*6M
 		pricingDate, 
 		Period(6, Months));
 
@@ -34,7 +34,7 @@ void europeanSwaption(
 		DateGeneration::Backward, 
 		false);
 
-	Rate swapRate = 0.0404;													// dummy swap rate
+	Rate swapRate = 0.0404;								// dummy swap rate
 
 	boost::shared_ptr<VanillaSwap> forwardSwap(
 		new VanillaSwap(VanillaSwap::Receiver, 1.0,
@@ -44,35 +44,39 @@ void europeanSwaption(
 	forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
 		new DiscountingSwapEngine(libor->forwardingTermStructure())));
 
-	swapRate = forwardSwap->fairRate();										// obtain the fair rate
+	swapRate = forwardSwap->fairRate() - .0075;										// obtain the fair rate
 
-	forwardSwap = boost::shared_ptr<VanillaSwap>(							// rebuild the "right" swap
-		new VanillaSwap(VanillaSwap::Receiver, 1.0,
-		schedule, swapRate, ActualActual(),
-		schedule, libor, 0.0, libor->dayCounter()));
-	forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
-		new DiscountingSwapEngine(libor->forwardingTermStructure())));
-
-	boost::shared_ptr<PricingEngine> engine(
-		new LfmSwaptionEngine(lfm,
-		libor->forwardingTermStructure()));
-	boost::shared_ptr<Exercise> exercise(
-		new EuropeanExercise(fwdStart));
-
-	boost::shared_ptr<Swaption> europeanSwaption(									// create the swaption
-		new Swaption(forwardSwap, exercise));
-	europeanSwaption->setPricingEngine(engine);
-
-	Real npv = europeanSwaption->NPV();
-	Real vol = europeanSwaption->impliedVolatility(
-		npv, libor->forwardingTermStructure(), .48);
+	// try to generate a smile
+	for (Size i = 0; i < 8; i++) {
 	
-	std::cout << "European swaption npv: "											// information
-			  << npv 
-			  << std::endl 
-			  << "implied vol is: "
-			  << vol 
-			  << "(initial value was 48.900)"
-			  << std::endl;
+		forwardSwap = boost::shared_ptr<VanillaSwap>(		// rebuild the "right" swap
+			new VanillaSwap(VanillaSwap::Receiver, 1.0,
+			schedule, swapRate + .0025 * i, ActualActual(),
+			schedule, libor, 0.0, libor->dayCounter()));
+		forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
+			new DiscountingSwapEngine(libor->forwardingTermStructure())));
 
+		boost::shared_ptr<PricingEngine> engine(
+			new LfmSwaptionEngine(lfm,
+			libor->forwardingTermStructure()));
+		boost::shared_ptr<Exercise> exercise(
+			new EuropeanExercise(fwdStart));
+
+		boost::shared_ptr<Swaption> europeanSwaption(									// create the swaption
+			new Swaption(forwardSwap, exercise));
+		europeanSwaption->setPricingEngine(engine);
+
+		Real npv = europeanSwaption->NPV();
+		Real vol = europeanSwaption->impliedVolatility(	// assumed vol level
+			npv, libor->forwardingTermStructure(), .48);
+
+		std::cout << "European swaption npv: "											// information
+			<< npv
+			<< std::endl
+			<< "implied vol is: "
+			<< vol
+			<< "(initial value was 48.900)"
+			<< std::endl;
+	
+	}
 }
