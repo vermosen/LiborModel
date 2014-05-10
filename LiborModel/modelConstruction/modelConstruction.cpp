@@ -163,7 +163,8 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	// set-up calibration helper
 	std::vector<boost::shared_ptr<CalibrationHelper> > calibrationHelper;
 
-	for (Size i = 0, Size j = 0; i < swaptions.size(); i++) {
+	Size j = 0;
+	for (Size i = 0; i < swaptions.size(); i++) {
 
 		if (swaptions[i].lenght_ + swaptions[i].maturity_ <= Period(max, Years)) {
 
@@ -196,12 +197,12 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 				pricingDate, swaptions[i].maturity_).serialNumber(),
 				j + 2, 28);
 
-			file.add(100 * calibrationHelper[i]->blackPrice(
+			file.add(100 * swaptionHelper->blackPrice(
 				swaptions[i].volatility_ / 100), j + 2, 29);
 
 			file.add(swaptions[i].volatility_, j + 2, 30);
 
-			j += 1;
+			j = j + 1;
 		}
 	}
 
