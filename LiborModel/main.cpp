@@ -28,15 +28,12 @@ int main() {
 
 		boost::shared_ptr<IborIndex> curve = curveCreation();
 
-		std::cout << "curve initialization completed." 
-				  << std::endl 
-				  << std::endl;
+		std::cout << "curve initialization completed." << std::endl;
+		std::cout << std::endl;
 
 		// step 2: vol term structure
 		std::cout << "step 2 : Market Model Setup" << std::endl;
 		std::cout << "---------------------------" << std::endl;
-
-		int i;
 
 		std::cout << "please select the appropriate procudure:" << std::endl;
 		std::cout << "1 - 10Y1 max maturity"                    << std::endl;
@@ -44,7 +41,7 @@ int main() {
 		std::cout << "3 - 5Y1 with default parameters"          << std::endl;
 		std::cout << "4 - curve data check"                     << std::endl;
 		
-		std::cin  >> i;
+		int i;  std::cin >> i;
 
 		boost::shared_ptr<LiborForwardModel> lfm;
 		

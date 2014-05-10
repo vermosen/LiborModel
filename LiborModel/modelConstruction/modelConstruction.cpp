@@ -288,18 +288,15 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 			  << boost::lexical_cast<std::string, Size>(steps)
 			  << " for each path..." 
 			  << std::endl;
-		
-	boost::shared_ptr<LiborForwardModelProcess> fwdProcess(	// create forward process
-		new LiborForwardModelProcess(size_, libor));
 
-	fwdProcess->setCovarParam(								// set-up pricing engine
+	process->setCovarParam(									// freeze the volatility and correlation
 		boost::shared_ptr<LfmCovarianceParameterization>(
 			new LfmCovarianceProxy(volaModel, corrModel)));
 
 	typedef PseudoRandom::rsg_type rsg_type;				// RNG definitions
 	typedef MultiPathGenerator<rsg_type>::sample_type sample_type;
 
-	std::vector<Time> tmp = fwdProcess->fixingTimes();
+	std::vector<Time> tmp = process->fixingTimes();
 	TimeGrid grid(tmp.begin(), tmp.end(), steps);			// creates time grid
 
 	std::vector<Size> location;
@@ -317,10 +314,10 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 #endif
 	
 	rsg_type rsg = PseudoRandom::make_sequence_generator(
-		fwdProcess->factors()*(grid.size() - 1),
+		process->factors()*(grid.size() - 1),
 		seed);
 
-	MultiPathGenerator<rsg_type> generator(fwdProcess, grid, rsg, false);
+	MultiPathGenerator<rsg_type> generator(process, grid, rsg, false);
 
 	// produce 1 simulation
 	Sample<MultiPath> s = generator.next();
