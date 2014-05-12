@@ -26,7 +26,7 @@ int main() {
 		std::cout << "step 1 : curve creation" << std::endl;
 		std::cout << "-----------------------" << std::endl;
 
-		boost::shared_ptr<IborIndex> curve = curveCreation();
+		boost::shared_ptr<IborIndex> curve = curveCreation(file);
 
 		std::cout << "curve initialization completed." << std::endl;
 		std::cout << std::endl;

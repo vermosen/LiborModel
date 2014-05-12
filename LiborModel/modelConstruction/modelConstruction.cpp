@@ -39,7 +39,7 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	}
 
 	SavedSettings backup;								// basic settings
-	const Size size_ = 18;								// 24 trimesters
+	const Size size_ = 24;								// 24 trimesters
 	const Real tolerance_ = 8e-3;						// tolerance
 	Date pricingDate =									// pricing date
 		Settings::instance().evaluationDate();
@@ -240,27 +240,14 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 		ssr = ssr + diff[i] * diff[i];
 	}
 
-	Array times(size_, 0.0); Array rates(size_, 0.0);	// saves yield curve data
-
-	for (Size i = 0; i < size_; i++) {
-
-		times[i] = fixingT[i];							// the fixing times from model
-		rates[i] = libor->forwardingTermStructure()->zeroRate(
-			times[i], Continuous);
-
-	}
-
-	file.add("times", 1, 1); file.add("rates", 1, 2);	// adds the yield curve data
-	file.add(times, 2, 1); file.add(rates, 2, 2);
-
 	file.add(std::string("calibration result:"), 1, 4);	// calibration result
 	file.add(model->endCriteria(), 2, 4);
 
 	file.add(std::string("calculated diff:"), 4, 4);	// calibration result
 	file.add(std::sqrt(ssr), 5, 4);
 		
-	file.add(std::string("individual errors:"), 21, 1);	// individual errors
-	file.add(diff, 22, 1);
+	file.add(std::string("individual errors:"), 23, 1);	// individual errors
+	file.add(diff, 24, 1);
 
 	file.add("volatility array at time zero", 1, 6);	// volatiltity in t=0
 	file.add(volaModel->volatility(0), 2, 6);
@@ -271,7 +258,7 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	file.add("parameters", 7, 4);						// calibrated parameters
 	file.add(model->params(), 8, 4);
 
-	file.add("correlation poarameters", 13, 4);			// parameters used for correlation
+	file.add("correlation parameters", 13, 4);			// parameters used for correlation
 	file.add(a, 14, 4);
 	file.add(b, 15, 4);
 
@@ -332,8 +319,8 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 	
 	}
 
-	file.add("sample path generated:", 22, 3);
-	file.add(values, 22, 3);
+	file.add("sample path generated:", 26, 3);
+	file.add(values, 27, 3);
 
 	// copy the calibration data
 	file.add("expiry date", 1, 27);

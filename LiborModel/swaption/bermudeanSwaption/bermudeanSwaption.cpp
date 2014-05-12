@@ -19,14 +19,24 @@ void bermudeanSwaption(
 		Settings::instance().evaluationDate();
 
 	Date optionStart = libor->fixingCalendar().advance(	// start in 2 days
-		pricingDate, 
+		pricingDate,
 		Period(2, Days));
 
-	Date optionEnd = libor->fixingCalendar().advance(	// start in 2 days
-		optionStart,
-		Period(6, Months));
+	Date last(16, July, 2016);
+	Date fwdMaturity(16, July, 2021);
 
-	Date fwdMaturity = optionStart + Period(3, Years);	// underlying 3 years
+	std::vector<Date> dates;							// dates for payment
+
+	while (last > optionStart) {
+	
+		dates.push_back(
+			libor->fixingCalendar().adjust(
+			last));
+	
+		last = libor->fixingCalendar().advance(
+			last, Period(-3, Months));
+
+	}
 
 	Schedule schedule(
 		optionStart,
@@ -41,7 +51,7 @@ void bermudeanSwaption(
 	Rate swapRate = 0.0404;								// dummy swap rate
 
 	boost::shared_ptr<VanillaSwap> forwardSwap(
-		new VanillaSwap(VanillaSwap::Receiver, 1.0,
+		new VanillaSwap(VanillaSwap::Receiver, 100.0,
 		schedule, swapRate, ActualActual(),
 		schedule, libor, 0.0, libor->dayCounter()));
 
@@ -51,7 +61,7 @@ void bermudeanSwaption(
 	swapRate = forwardSwap->fairRate();					// obtain the fair rate
 
 	forwardSwap = boost::shared_ptr<VanillaSwap>(		// rebuild the "right" swap
-		new VanillaSwap(VanillaSwap::Receiver, 1.0,
+		new VanillaSwap(VanillaSwap::Receiver, 100.0,
 		schedule, swapRate, ActualActual(),
 		schedule, libor, 0.0, libor->dayCounter()));
 	forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
@@ -60,24 +70,6 @@ void bermudeanSwaption(
 	boost::shared_ptr<PricingEngine> engine(
 		new LfmSwaptionEngine(lfm,
 		libor->forwardingTermStructure()));
-
-	std::vector<Date> dates;							// dates for payment
-	dates.push_back(
-		libor->fixingCalendar().advance(
-			optionStart, Period(1, Months)));
-	dates.push_back(
-		libor->fixingCalendar().advance(
-		optionStart, Period(2, Months)));
-	dates.push_back(
-		libor->fixingCalendar().advance(
-		optionStart, Period(3, Months)));
-	dates.push_back(
-		libor->fixingCalendar().advance(
-		optionStart, Period(4, Months)));
-	dates.push_back(
-		libor->fixingCalendar().advance(
-		optionStart, Period(5, Months)));
-	dates.push_back(optionEnd);
 		
 	boost::shared_ptr<Exercise> exercise(
 		new BermudanExercise(dates));

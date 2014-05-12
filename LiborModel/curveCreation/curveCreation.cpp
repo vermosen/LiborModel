@@ -2,7 +2,8 @@
 
 using namespace QuantLib;
 
-boost::shared_ptr<IborIndex> curveCreation()			// creates the libor index
+boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index
+	utilities::csvBuilder & file)			
 {
 
 	const Real convexity_ = 0.009;						// convexity adjustment for future prices
@@ -185,6 +186,28 @@ boost::shared_ptr<IborIndex> curveCreation()			// creates the libor index
 		new swapCurve(rateHelpers, calendar, 10e-12));
 
 	ts->linkTo(curve);									// finally relink the index
+
+	Size size_ = 20;
+	Array times(size_, 0.0);							// saves yield curve data
+	Array rates(size_, 0.0);	
+	Array fwd  (size_, 0.0);
+
+	for (Size i = 0; i < size_; i++) {
+
+		times[i] = .5 * i;								// the fixing times from model
+		rates[i] = libor->forwardingTermStructure()->zeroRate(
+			times[i], Continuous);
+		fwd[i] = libor->forwardingTermStructure()->forwardRate(
+			times[i], times[i] + .02, Continuous);
+
+	}
+
+	file.add("times"  , 1, 1);							// adds the yield curve data
+	file.add("rates"  , 1, 2);
+	file.add("forward", 1, 3);
+	file.add(times    , 2, 1); 
+	file.add(rates    , 2, 2);
+	file.add(fwd      , 2, 3);
 
 	return libor;
 

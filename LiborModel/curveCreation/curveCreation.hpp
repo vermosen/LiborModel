@@ -9,6 +9,7 @@
 #include <ql/time/calendars/all.hpp>
 #include <ql/indexes/ibor/usdlibor.hpp>
 #include <ql/termstructures/yield/swapCurve.hpp>
+#include <ql/utilities/csvBuilder.hpp>
 
 using namespace QuantLib;
 
@@ -42,6 +43,6 @@ struct swaptionData {
 
 };
 
-boost::shared_ptr<IborIndex> curveCreation();
+boost::shared_ptr<IborIndex> curveCreation(utilities::csvBuilder &);
 
 #endif

@@ -18,11 +18,9 @@ void europeanSwaption(
 	Date pricingDate =									// pricing date
 		Settings::instance().evaluationDate();
 
-	Date fwdStart = libor->fixingCalendar().advance(	// 3Y*6M
-		pricingDate, 
-		Period(6, Months));
-
-	Date fwdMaturity = fwdStart + Period(3, Years);
+	Date fwdStart(16, July, 2017);
+	Date fwdMaturity(16, July, 2020);
+	//Date fwdMaturity = fwdStart + Period(3, Years);
 
 	Schedule schedule(
 		fwdStart, 
@@ -37,20 +35,20 @@ void europeanSwaption(
 	Rate swapRate = 0.0404;								// dummy swap rate
 
 	boost::shared_ptr<VanillaSwap> forwardSwap(
-		new VanillaSwap(VanillaSwap::Receiver, 1.0,
+		new VanillaSwap(VanillaSwap::Receiver, 100.0,
 		schedule, swapRate, ActualActual(),
 		schedule, libor, 0.0, libor->dayCounter()));
 
 	forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
 		new DiscountingSwapEngine(libor->forwardingTermStructure())));
 
-	swapRate = forwardSwap->fairRate() - .0075;										// obtain the fair rate
+	swapRate = forwardSwap->fairRate();										// obtain the fair rate
 
 	// try to generate a smile
-	for (Size i = 0; i < 8; i++) {
+	for (Size i = 0; i < 1; i++) {
 	
 		forwardSwap = boost::shared_ptr<VanillaSwap>(		// rebuild the "right" swap
-			new VanillaSwap(VanillaSwap::Receiver, 1.0,
+			new VanillaSwap(VanillaSwap::Receiver, 100.0,
 			schedule, swapRate + .0025 * i, ActualActual(),
 			schedule, libor, 0.0, libor->dayCounter()));
 		forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(

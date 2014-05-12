@@ -21,12 +21,15 @@ void americanSwaption(
 	Date optionStart = libor->fixingCalendar().advance(	// start in 2 days
 		pricingDate, 
 		Period(2, Days));
+	
+	Date optionEnd(16, July, 2016);
+	Date fwdMaturity(16, July, 2021);
 
-	Date optionEnd = libor->fixingCalendar().advance(	// start in 2 days
-		optionStart,
-		Period(6, Months));
+	//Date optionEnd = libor->fixingCalendar().advance(	// start in 2 days
+	//	optionStart,
+	//	Period(6, Months));
 
-	Date fwdMaturity = optionStart + Period(3, Years);	// underlying 3 years
+	//Date fwdMaturity = optionStart + Period(3, Years);	// underlying 3 years
 
 	Schedule schedule(
 		optionStart,
@@ -41,7 +44,7 @@ void americanSwaption(
 	Rate swapRate = 0.0404;								// dummy swap rate
 
 	boost::shared_ptr<VanillaSwap> forwardSwap(
-		new VanillaSwap(VanillaSwap::Receiver, 1.0,
+		new VanillaSwap(VanillaSwap::Receiver, 100.0,
 		schedule, swapRate, ActualActual(),
 		schedule, libor, 0.0, libor->dayCounter()));
 
@@ -51,7 +54,7 @@ void americanSwaption(
 	swapRate = forwardSwap->fairRate();					// obtain the fair rate
 
 	forwardSwap = boost::shared_ptr<VanillaSwap>(		// rebuild the "right" swap
-		new VanillaSwap(VanillaSwap::Receiver, 1.0,
+		new VanillaSwap(VanillaSwap::Receiver, 100.0,
 		schedule, swapRate, ActualActual(),
 		schedule, libor, 0.0, libor->dayCounter()));
 	forwardSwap->setPricingEngine(boost::shared_ptr<PricingEngine>(
