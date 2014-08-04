@@ -92,6 +92,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="curveCreation\curveCreation.cpp" />
+    <ClCompile Include="modelConstructionNew\modelConstructionNew.cpp" />
     <ClCompile Include="swaption\americanSwaption\americanSwaption.cpp" />
     <ClCompile Include="swaption\bermudeanSwaption\bermudeanSwaption.cpp" />
     <ClCompile Include="swaption\europeanSwaption\europeanSwaption.cpp" />
@@ -111,6 +112,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="curveCreation\curveCreation.hpp" />
+    <ClInclude Include="modelConstructionNew\modelConstructionNew.hpp" />
     <ClInclude Include="swaption\americanSwaption\americanSwaption.hpp" />
     <ClInclude Include="swaption\bermudeanSwaption\bermudeanSwaption.hpp" />
     <ClInclude Include="swaption\europeanSwaption\europeanSwaption.hpp" />

@@ -1,6 +1,7 @@
-#ifndef model_construction
-#define model_construction
+#ifndef model_construction_new
+#define model_construction_new
 
+#include <ql/models/marketmodels/all.hpp>
 #include <ql/legacy/libormarketmodels/all.hpp>
 #include <ql/utilities/csvbuilder.hpp>
 #include <ql/models/shortrate/calibrationhelpers/swaptionhelper.hpp>
@@ -11,7 +12,7 @@
 
 #include "curveCreation/curveCreation.hpp"
 
-boost::shared_ptr<LiborForwardModel> modelConstruction(
+boost::shared_ptr<MarketModel> modelConstruction(
 	boost::shared_ptr<IborIndex> &,
 	const Natural &,
 	utilities::csvBuilder &,

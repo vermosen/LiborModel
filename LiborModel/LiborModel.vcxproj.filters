@@ -48,6 +48,9 @@
     <ClCompile Include="swaption\bermudeanSwaption\bermudeanSwaption.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="modelConstructionNew\modelConstructionNew.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Text.txt" />
@@ -84,6 +87,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="swaption\bermudeanSwaption\bermudeanSwaption.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="modelConstructionNew\modelConstructionNew.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

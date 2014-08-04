@@ -1,3 +1,6 @@
+#ifndef main_hpp
+#define main_hpp
+
 #include "curveCreation/curveCreation.hpp"
 #include "modelConstruction/modelConstruction.hpp"
 #include "yieldCurveData/yieldCurveData.hpp"
@@ -8,3 +11,5 @@
 
 // main .exe entry point
 int main(int argc, char** argv);
+
+#endif

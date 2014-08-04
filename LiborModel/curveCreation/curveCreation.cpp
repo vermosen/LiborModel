@@ -2,12 +2,11 @@
 
 using namespace QuantLib;
 
-boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index
-	utilities::csvBuilder & file)			
-{
+boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index (the "curve")
+	utilities::csvBuilder & file) {
 
-	const Real convexity_ = 0.009;						// convexity adjustment for future prices
-	const Real meanReverting_ = 0.09;					// mean reversion for future prices
+	const Real convexity_     = 0.009;					// convexity adjustment for future prices
+	const Real meanReverting_ = 0.09 ;					// mean reversion for future prices
 
 	const Calendar calendar								// pricing calendar
 		= JointCalendar(
@@ -17,9 +16,8 @@ boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index
 	const Date pricingDate								// set global evaluation date
 		= Settings::instance().evaluationDate();
 
-	/* create the yield term structure */
 	boost::shared_ptr<RelinkableHandle<YieldTermStructure> > ts(
-		new RelinkableHandle<YieldTermStructure>());
+		new RelinkableHandle<YieldTermStructure>());	// create the yield term structure
 
 	boost::shared_ptr<IborIndex> libor(					// libor index associated
 		new USDLibor(
@@ -38,9 +36,9 @@ boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index
 		= std::vector<depositData>
 	{
 
-		{ .0009070, 0, Period(1, Days) },
-		{ .0014250, 1, Period(2, Days) },
-		{ .0012150, 2, Period(1, Weeks) },
+		{ .0009070, 0, Period(1, Days  ) },
+		{ .0014250, 1, Period(2, Days  ) },
+		{ .0012150, 2, Period(1, Weeks ) },
 		{ .0015200, 2, Period(1, Months) },
 		{ .0019300, 2, Period(2, Months) }
 
@@ -68,12 +66,12 @@ boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index
 		= std::vector<swapData>
 	{
 
-		{ .0139980, Period(4, Years) },
-		{ .0176100, Period(5, Years) },
-		{ .0205300, Period(6, Years) },
-		{ .0228500, Period(7, Years) },
-		{ .0247290, Period(8, Years) },
-		{ .0262750, Period(9, Years) },
+		{ .0139980, Period(4 , Years) },
+		{ .0176100, Period(5 , Years) },
+		{ .0205300, Period(6 , Years) },
+		{ .0228500, Period(7 , Years) },
+		{ .0247290, Period(8 , Years) },
+		{ .0262750, Period(9 , Years) },
 		{ .0275070, Period(10, Years) },
 		{ .0286800, Period(11, Years) },
 		{ .0296100, Period(12, Years) }
@@ -203,10 +201,10 @@ boost::shared_ptr<IborIndex> curveCreation(				// creates the libor index
 	}
 
 	file.add("times"  , 1, 1);							// adds the yield curve data
-	file.add("rates"  , 1, 2);
-	file.add("forward", 1, 3);
 	file.add(times    , 2, 1); 
+	file.add("rates"  , 1, 2);
 	file.add(rates    , 2, 2);
+	file.add("forward", 1, 3);
 	file.add(fwd      , 2, 3);
 
 	return libor;

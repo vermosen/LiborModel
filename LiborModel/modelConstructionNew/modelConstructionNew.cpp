@@ -8,9 +8,9 @@
 *
 */
 
-#include "modelConstruction/modelConstruction.hpp"
+#include "modelConstructionNew/modelConstructionNew.hpp"
 
-boost::shared_ptr<LiborForwardModel> modelConstruction(
+boost::shared_ptr<MarketModel> modelConstruction(
 	boost::shared_ptr<IborIndex> & libor,
 	const Natural & max,
 	utilities::csvBuilder & file,
