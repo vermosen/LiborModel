@@ -136,6 +136,9 @@ boost::shared_ptr<MarketModel> modelConstruction(
 	Handle<YieldTermStructure> termStructure =				// ts handle
 		libor->forwardingTermStructure();
 
+
+
+
 	// set up the process
 	boost::shared_ptr<LiborForwardModelProcess> process(
 		new LiborForwardModelProcess(size_, libor));

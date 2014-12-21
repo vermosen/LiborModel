@@ -142,7 +142,7 @@ boost::shared_ptr<LiborForwardModel> modelConstruction(
 
 	std::vector<Time> fixingT = process->fixingTimes();
 
-	// set-up the volatility model -> close to expected values to speed-yup calibration
+	// set-up the volatility model -> close to expected values to speed-up calibration
 	boost::shared_ptr<LmVolatilityModel> volaModel(
 		new LmLinearExponentialVolatilityModel(process->fixingTimes(),
 		0.9, 1.2, 0.35, 0.1));
